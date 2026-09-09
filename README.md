@@ -1,4 +1,11 @@
-# WAZUH FIM - Advanced Defender's Handbook # 
+<center> 
+  
+# WAZUH FIM - File Integrity Monitoring # 
+
+</center>
+
+Advanced Defender's Handbook 
+
 
 The Advanced Defender's Handbook
 
