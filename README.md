@@ -1,2 +1,11 @@
-# wazuh-fim-adh
-he Advanced Defender's Handbook   Architecture, Adversary Simulation, Threat Hunting and Compliance
+# WAZUH FIM - Advanced Defender's Handbook # 
+
+The Advanced Defender's Handbook
+
+# X 
+
+```
+<syscheck> 
+  <directories check_all="yes" whodata="yes" report_changes="yes">/monitored/path</directories> 
+</syscheck>
+```
