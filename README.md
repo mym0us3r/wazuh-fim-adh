@@ -1,6 +1,9 @@
-# FIM Advanced Handbook with Wazuh 4.14.8
+# WAZUH FIM - File Integrity Monitoring
+## The Advanced Defender’s Handbook
 
-> **Advanced File Integrity Monitoring — anomaly correlation, AI-assisted triage, and Active Response pipeline · Windows 11 (LABDESK) / Wazuh 4.14.8**
+> **Advanced File Integrity Monitoring - Anomaly correlation, AI-assisted triage, and Active Response pipeline**
+
+> *Windows 11 (LABDESK) / Wazuh 4.14.8*
 
 [![rules](https://img.shields.io/badge/wazuh_rules-21-brightgreen)](https://github.com/mym0us3r/wazuh-fim-adh) [![stages](https://img.shields.io/badge/pipeline_stages-2-blue)](https://github.com/mym0us3r/wazuh-fim-adh) [![status](https://img.shields.io/badge/status-production--validated-success)](https://github.com/mym0us3r/wazuh-fim-adh) [![mitre](https://img.shields.io/badge/MITRE-T1204.002%20%7C%20T1486%20%7C%20T1565.001-red)](https://attack.mitre.org/techniques/T1204/002/) [![wazuh](https://img.shields.io/badge/Wazuh-4.14.8-0080FF)](https://documentation.wazuh.com/current/release-notes/release-4-14-8.html) [![ambassador](https://img.shields.io/badge/Wazuh-Ambassador-0080FF)](https://wazuh.com/ambassadors-program/)
 
@@ -18,7 +21,7 @@ Detection engineering content for Wazuh 4.14.8 covering three capabilities built
 
 Developed as part of the [Wazuh Ambassador Program](https://wazuh.com/ambassadors-program/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
 
-Reference lab: **WZ-SRV** (Wazuh Server 4.14.8, Ubuntu 24.04 LTS, 3.9 GB RAM) + **LABDESK** (Windows 11 26200, Wazuh Agent 4.14.8).
+Reference lab: **WZ-SRV** (Wazuh Server 4.14.8, Ubuntu 24.04 LTS, 4GB RAM) + **LABDESK** (Windows 11 26200, Wazuh Agent 4.14.8).
 
 ---
 
