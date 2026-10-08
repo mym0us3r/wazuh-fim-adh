@@ -1,6 +1,15 @@
 # wazuh-fim-adh
 
-**Wazuh FIM em Profundidade: O Handbook do Defensor Avançado**
+> **Wazuh FIM em Profundidade: O Handbook do Defensor Avançado**
+
+[![fim_ai_rules](https://img.shields.io/badge/fim_ai_rules-9-brightgreen)](https://github.com/mym0us3r/wazuh-fim-adh)
+[![anomaly_rules](https://img.shields.io/badge/anomaly_rules-5-blue)](https://github.com/mym0us3r/wazuh-fim-adh)
+[![status](https://img.shields.io/badge/status-production--validated-success)](https://github.com/mym0us3r/wazuh-fim-adh)
+[![wazuh](https://img.shields.io/badge/wazuh-4.14.8-005571)](https://documentation.wazuh.com/current/release-notes/release-4-14-8.html)
+[![platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux-lightgrey)](https://github.com/mym0us3r/wazuh-fim-adh)
+[![mitre](https://img.shields.io/badge/MITRE-T1204.002-red)](https://attack.mitre.org/techniques/T1204/002/)
+[![mitre](https://img.shields.io/badge/MITRE-T1485-red)](https://attack.mitre.org/techniques/T1485/)
+[![mitre](https://img.shields.io/badge/MITRE-T1486-red)](https://attack.mitre.org/techniques/T1486/)
 
 Conteúdo de Detection Engineering para Wazuh 4.14.8 cobrindo três capacidades construídas sobre o motor nativo de FIM:
 
@@ -8,7 +17,7 @@ Conteúdo de Detection Engineering para Wazuh 4.14.8 cobrindo três capacidades 
 
 **2. FIM Alert Investigation** - painel de investigação assistida por IA integrado ao WAZUH-Process-Tree-Viewer. Quando um alerta FIM chega, o analista abre o painel, seleciona o alerta e aciona o Claude Sonnet 4.6 com contexto completo: evento focal, eventos de arquivo/registro/processo nos ±60s no mesmo agente, e resultados do pipeline FIM AI. O LLM raciocina sobre comportamento e entrega veredito, técnicas MITRE com confiança e ações recomendadas.
 
-**3. Configuração hardened de endpoints** - `ossec.conf` validado em produção para Windows e Linux com paths explícitos por usuário, `whodata` em diretórios de sistema e `realtime` em paths do usuário. Inclui correções para sete pontos de falha não documentados no handbook oficial.
+**3. Configuração hardened de endpoints** - `ossec.conf` validado em produção para Windows e Linux com paths explícitos por usuário, `whodata` em diretórios de sistema e `realtime` em paths do usuário. Inclui correções para seis pontos de falha não documentados no handbook oficial.
 
 Desenvolvido como parte do [Programa Wazuh Ambassador](https://wazuh.com/ambassadors-program/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
 
@@ -29,7 +38,7 @@ FIM em tempo real sem contexto:
   problema: detecção sem contexto é ruído
 
 FIM Alert Investigation (este repositório):
-  arquivo criado 19:25:23 → FIM detecta (regra 109020)
+  arquivo criado 19:25:23 → FIM detecta (regra 554)
   19:25:29 → YARA match: FIM_AI_Lab_Test
   19:25:39 → Claude Sonnet 4.6: VT 0/0, score=35, zone=medium
   latência total FIM-to-verdict: 16 segundos
@@ -58,10 +67,10 @@ Nginx:
 │                      │                                      │
 │              GET /api/fim/alerts                            │
 │                      │                                      │
-│         OpenSearch wazuh-alerts-*                           │
+│         wazuh-alerts-*                                      │
 │         Regras: 550/553/554/517 (arquivo)                   │
 │                 594-752 (registro)                          │
-│                 109001/002/012/014/015/020 (FIM AI)         │
+│                 70000-70015 (FIM AI)                        │
 │                 100300-100304 (anomalia)                    │
 │                      │                                      │
 │  Analista seleciona alerta → GET /api/fim/context           │
@@ -92,7 +101,7 @@ Nginx:
 |-------|--------|-----------|
 | A - Arquivo | 550, 553, 554, 517 | Modificado, excluído, adicionado, auditoria |
 | B - Registro | 594, 597, 598, 750, 751, 752 | Chaves e valores de registro Windows |
-| C - FIM AI | 109001, 109002, 109012, 109014, 109015, 109020 | Pipeline FIM AI (YARA, ClamAV, confiança média/alta) |
+| C - FIM AI | 70000, 70001, 70002, 70010-70015 | Pipeline FIM AI (YARA, Defender, confiança média/alta) |
 | D - Anomalia | 100300-100304 | Correlação de volume (ransomware, anti-forense) |
 
 ### Saída validada
@@ -133,7 +142,7 @@ Veredito LLM:
 wazuh-fim-adh/
 │
 ├── rules/
-│   ├── fim_ai_rules.xml              # Regras 109000-109020 — pipeline FIM AI
+│   ├── fim_ai_rules.xml              # Regras 70000-70015 — pipeline FIM AI
 │   └── fim_anomaly_rules.xml         # Regras 100300-100304 — correlação de anomalia
 │
 ├── decoders/
@@ -153,7 +162,6 @@ wazuh-fim-adh/
 ├── docs/
 │   ├── fim_alert_investigation_panel.png
 │   ├── fim_ai_verdict_example.png
-│   ├── rule_109020_discover.png
 │   └── wazuh-fim-documentacao-completa-pt-br.docx   # Handbook completo (PT-BR, 62 páginas)
 │
 └── ROADMAP.md
@@ -169,7 +177,7 @@ wazuh-fim-adh/
 | Agente Windows | 4.14.8 — LABDESK, Windows 11 Pro build 26200, usuário `kr` |
 | Agente Linux | 4.14.8 — labnix, Ubuntu 24.04.5, kernel 6.17.0, usuário `kr` |
 | YARA | 4.5.5 — `winget install VirusTotal.YARA` (Windows) / `apt install yara` (Linux) |
-| ClamAV | 1.5.4 — `clamav-daemon` para scan via socket (0.008s por arquivo) |
+| Windows Defender | integrado via PowerShell — scan sob demanda pelo pipeline |
 | Ruleset YARA | Valhalla demo — CC-BY-NC 4.0 |
 | Inteligência | VirusTotal, AlienVault OTX, URLScan.io, Anthropic (Claude Sonnet 4.6) |
 | WPTV | [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer) |
@@ -241,15 +249,14 @@ location /api/fim/ {
 
 ## Achados Técnicos do Lab
 
-Sete achados documentados durante a implantação. Todos reproduzíveis e relevantes para qualquer deploy Wazuh em ambiente Windows e Linux.
+Seis achados documentados durante a implantação. Todos reproduzíveis e relevantes para qualquer deploy Wazuh em ambiente Windows e Linux.
 
-1. **Loop PyInstaller `--onefile` via `C:\Windows\Temp`** — `--runtime-tmpdir` obrigatório para AR Python no Windows. Sem ele: 3335 alertas em três horas, 43-124 alertas/minuto.
-2. **Loop via perfil PowerShell da conta SYSTEM** — `run_defender()` regrava `StartupProfileData-NonInteractive`. Adicionar `<ignore>` específico no `ossec.conf` do agente.
-3. **Active Response Windows requer `.exe`** — `.bat` e `.ps1` não passam stdin do execd de forma confiável (erro 1317).
+1. **Loop PyInstaller `--onefile` via `C:\Windows\Temp`** — `--runtime-tmpdir` obrigatório para executáveis Python compilados no Windows. Sem ele: 3335 alertas em três horas, 43-124 alertas/minuto.
+2. **Loop via perfil PowerShell da conta SYSTEM** — scripts de scan regravavam `StartupProfileData-NonInteractive`. Adicionar `<ignore>` específico no `ossec.conf` do agente resolve.
+3. **Executável de scan Windows requer `.exe`** — `.bat` e `.ps1` não recebem stdin do execd de forma confiável no Windows (erro 1317). PyInstaller resolve.
 4. **`field name="file"` e não `syscheck.path`** — campo correto para matching de path em regras FIM customizadas. Erro silencioso: analysisd não reporta falha.
-5. **Saturação do execd por fontes de ruído** — Chrome `.crdownload`, Trend Micro, Sublime Text. Regra 109020 com pcre2 resolve.
+5. **Saturação do syscheck por fontes de ruído** — Chrome `.crdownload`, Trend Micro, Sublime Text. Filtrar via `<ignore>` com `type="sregex"` no `ossec.conf` do agente.
 6. **auditpol obrigatório para whodata em workgroup Windows** — sem política de auditoria em Êxito, o SACL é invalidado silenciosamente pelo Windows Defender. O Wazuh emite erro 6021.
-7. **Logcollector perde tracking após restart do manager** — `active-responses.log` pode parar de ser lido. Verificar com `grep -a "active-responses" /var/ossec/logs/ossec.log | tail -5`.
 
 ---
 
@@ -282,7 +289,7 @@ Sete achados documentados durante a implantação. Todos reproduzíveis e releva
 
 ---
 
-*Regras de detecção, decoders, painel FIM Alert Investigation e configurações de agente validados no Wazuh 4.14.8, Windows 11 Pro build 26200, Ubuntu 24.04.5 kernel 6.17.0, PyInstaller 6.22.3, YARA 4.5.5, ClamAV 1.5.4 e Claude Sonnet 4.6.*
+*Regras de detecção, decoders, painel FIM Alert Investigation e configurações de agente validados no Wazuh 4.14.8, Windows 11 Pro build 26200, Ubuntu 24.04.5 kernel 6.17.0, PyInstaller 6.22.3, YARA 4.5.5, Windows Defender e Claude Sonnet 4.6.*
 
 ---
 
