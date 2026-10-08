@@ -83,7 +83,7 @@ Nginx:
 │         - Resultados do pipeline FIM AI                     │
 │         - Alertas de anomalia                               │
 │                      │                                      │
-│  Analista clica "Investigate with AI"                       │
+│  Analista clica 'Investigate with AI'                       │
 │              POST /api/fim/analyze                          │
 │                      │                                      │
 │         Claude Sonnet 4.6 (Anthropic API)                   │
@@ -114,7 +114,7 @@ Contexto ±60s: 8 eventos de processo com key: lpe_quartet_root_netlink_route
 
 Veredito LLM:
   risk_score: 50 | risk_level: MEDIUM
-  T1068 Exploitation for Privilege Escalation — 52% de confiança
+  T1068 Exploitation for Privilege Escalation - 52% de confiança
   IOC: /usr/bin/vmtoolsd disparando audit key de LPE
   Ação: auditar integridade do vmtoolsd, correlacionar audit key
         lpe_quartet_root_netlink_route na linha do tempo completa do SIEM
@@ -142,17 +142,17 @@ Veredito LLM:
 wazuh-fim-adh/
 │
 ├── rules/
-│   ├── fim_ai_rules.xml              # Regras 70000-70015 — pipeline FIM AI
-│   └── fim_anomaly_rules.xml         # Regras 100300-100304 — correlação de anomalia
+│   ├── fim_ai_rules.xml              # Regras 70000-70015 - pipeline FIM AI
+│   └── fim_anomaly_rules.xml         # Regras 100300-100304 - correlação de anomalia
 │
 ├── decoders/
 │   └── fim_ai_decoder.xml            # JSON_Decoder Stage 1 (fim_ai_endpoint)
 │                                     #               Stage 2 (fim_ai_intel)
 │
 ├── config/
-│   ├── ossec_server.conf             # ossec.conf do servidor — localfile, FIM AI
-│   ├── ossec_agent_windows.conf      # ossec.conf do agente Windows — paths + ignores
-│   └── ossec_agent_linux.conf        # ossec.conf do agente Linux — whodata + realtime
+│   ├── ossec_server.conf             # ossec.conf do servidor - localfile, FIM AI
+│   ├── ossec_agent_windows.conf      # ossec.conf do agente Windows - paths + ignores
+│   └── ossec_agent_linux.conf        # ossec.conf do agente Linux - whodata + realtime
 │
 ├── wptv-fim/
 │   ├── logic_fim.py                  # Lógica de investigação FIM (extensão do WPTV)
@@ -173,12 +173,12 @@ wazuh-fim-adh/
 
 | Componente | Detalhe |
 |-----------|---------|
-| Wazuh Server | 4.14.8 — WZ-SRV, Ubuntu 24.04 LTS, 3.9 GB RAM |
-| Agente Windows | 4.14.8 — LABDESK, Windows 11 Pro build 26200, usuário `kr` |
-| Agente Linux | 4.14.8 — labnix, Ubuntu 24.04.5, kernel 6.17.0, usuário `kr` |
-| YARA | 4.5.5 — `winget install VirusTotal.YARA` (Windows) / `apt install yara` (Linux) |
-| Windows Defender | integrado via PowerShell — scan sob demanda pelo pipeline |
-| Ruleset YARA | Valhalla demo — CC-BY-NC 4.0 |
+| Wazuh Server | 4.14.8 - WZ-SRV, Ubuntu 24.04 LTS, 3.9 GB RAM |
+| Agente Windows | 4.14.8 - LABDESK, Windows 11 Pro build 26200, usuário `kr` |
+| Agente Linux | 4.14.8 - labnix, Ubuntu 24.04.5, kernel 6.17.0, usuário `kr` |
+| YARA | 4.5.5 - `winget install VirusTotal.YARA` (Windows) / `apt install yara` (Linux) |
+| Windows Defender | integrado via PowerShell - scan sob demanda pelo pipeline |
+| Ruleset YARA | Valhalla demo - CC-BY-NC 4.0 |
 | Inteligência | VirusTotal, AlienVault OTX, URLScan.io, Anthropic (Claude Sonnet 4.6) |
 | WPTV | [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer) |
 
@@ -188,7 +188,7 @@ wazuh-fim-adh/
 
 - Wazuh Server 4.14.8 e agentes 4.14.8
 - Python 3.10+ no servidor (para `logic_fim.py`)
-- Chaves de API: VirusTotal, AlienVault OTX, URLScan.io, Anthropic — armazenadas em `/etc/wazuh-process-tree/wptv.env`
+- Chaves de API: VirusTotal, AlienVault OTX, URLScan.io, Anthropic - armazenadas em `/etc/wazuh-process-tree/wptv.env`
 - WAZUH-Process-Tree-Viewer instalado (`/usr/share/wazuh-dashboard/plugins/process_tree_api/`)
 - Filebeat com módulo archives habilitado (`archives.enabled: true` em `filebeat.yml`)
 - `logall_json: yes` no `ossec.conf` do servidor para contexto de processo no painel
@@ -214,18 +214,18 @@ chown wazuh-dashboard:wazuh-dashboard \
 chmod 755 $DEST/logic_fim.py $DEST/server.py
 chmod 644 $DEST/public/fim.html
 
-# wptv.env — adicionar chave Anthropic e archives
+# wptv.env - adicionar chave Anthropic e archives
 echo "WPTV_ANTHROPIC_API_KEY=<sua_chave>" >> /etc/wazuh-process-tree/wptv.env
 echo "WPTV_ARCHIVE_INDEX=wazuh-archives-*" >> /etc/wazuh-process-tree/wptv.env
 
-# Nginx — adicionar location /fim-investigation/
+# Nginx - adicionar location /fim-investigation/
 # (mesmo padrão do /wptv/ no arquivo de site existente)
 
 # Reiniciar
 systemctl restart wazuh-process-tree
 ```
 
-### Nginx — adicionar ao site existente
+### Nginx - adicionar ao site existente
 
 ```nginx
 location /fim-investigation/ {
@@ -251,12 +251,12 @@ location /api/fim/ {
 
 Seis achados documentados durante a implantação. Todos reproduzíveis e relevantes para qualquer deploy Wazuh em ambiente Windows e Linux.
 
-1. **Loop PyInstaller `--onefile` via `C:\Windows\Temp`** — `--runtime-tmpdir` obrigatório para executáveis Python compilados no Windows. Sem ele: 3335 alertas em três horas, 43-124 alertas/minuto.
-2. **Loop via perfil PowerShell da conta SYSTEM** — scripts de scan regravavam `StartupProfileData-NonInteractive`. Adicionar `<ignore>` específico no `ossec.conf` do agente resolve.
-3. **Executável de scan Windows requer `.exe`** — `.bat` e `.ps1` não recebem stdin do execd de forma confiável no Windows (erro 1317). PyInstaller resolve.
-4. **`field name="file"` e não `syscheck.path`** — campo correto para matching de path em regras FIM customizadas. Erro silencioso: analysisd não reporta falha.
-5. **Saturação do syscheck por fontes de ruído** — Chrome `.crdownload`, Trend Micro, Sublime Text. Filtrar via `<ignore>` com `type="sregex"` no `ossec.conf` do agente.
-6. **auditpol obrigatório para whodata em workgroup Windows** — sem política de auditoria em Êxito, o SACL é invalidado silenciosamente pelo Windows Defender. O Wazuh emite erro 6021.
+1. **Loop PyInstaller `--onefile` via `C:\Windows\Temp`** - `--runtime-tmpdir` obrigatório para executáveis Python compilados no Windows. Sem ele: 3335 alertas em três horas, 43-124 alertas/minuto.
+2. **Loop via perfil PowerShell da conta SYSTEM** - scripts de scan regravavam `StartupProfileData-NonInteractive`. Adicionar `<ignore>` específico no `ossec.conf` do agente resolve.
+3. **Executável de scan Windows requer `.exe`** - `.bat` e `.ps1` não recebem stdin do execd de forma confiável no Windows (erro 1317). PyInstaller resolve.
+4. **`field name="file"` e não `syscheck.path`** - campo correto para matching de path em regras FIM customizadas. Erro silencioso: analysisd não reporta falha.
+5. **Saturação do syscheck por fontes de ruído** - Chrome `.crdownload`, Trend Micro, Sublime Text. Filtrar via `<ignore>` com `type="sregex"` no `ossec.conf` do agente.
+6. **auditpol obrigatório para whodata em workgroup Windows** - sem política de auditoria em Êxito, o SACL é invalidado silenciosamente pelo Windows Defender. O Wazuh emite erro 6021.
 
 ---
 
@@ -266,10 +266,10 @@ Seis achados documentados durante a implantação. Todos reproduzíveis e releva
 - [Regras FIM customizadas](https://documentation.wazuh.com/current/user-manual/capabilities/file-integrity/creating-custom-fim-rules.html)
 - [Configuração syscheck](https://documentation.wazuh.com/current/user-manual/reference/ossec-conf/syscheck.html)
 - [Release notes 4.14.8](https://documentation.wazuh.com/current/release-notes/release-4-14-8.html)
-- [PyInstaller — `--runtime-tmpdir`](https://pyinstaller.org/en/stable/usage.html)
-- [PyInstaller — How the One-File Program Works](https://pyinstaller.org/en/stable/operating-mode.html)
+- [PyInstaller - `--runtime-tmpdir`](https://pyinstaller.org/en/stable/usage.html)
+- [PyInstaller - How the One-File Program Works](https://pyinstaller.org/en/stable/operating-mode.html)
 - [Valhalla YARA Rule Set](https://valhalla.nextron-systems.com/) (Nextron Systems, CC-BY-NC 4.0)
-- [MITRE ATT&CK T1204.002 — Malicious File](https://attack.mitre.org/techniques/T1204/002/)
+- [MITRE ATT&CK T1204.002 - Malicious File](https://attack.mitre.org/techniques/T1204/002/)
 - [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer)
 - [DIRTY-FRAG Detection with Wazuh 4.14.4](https://github.com/mym0us3r/DIRTY-FRAG-Detection-with-Wazuh-4.14.4)
 - [COPY-FAIL Detection with Wazuh 4.14.4](https://github.com/mym0us3r/COPY-FAIL-Detection-with-Wazuh-4.14.4)
@@ -278,7 +278,7 @@ Seis achados documentados durante a implantação. Todos reproduzíveis e releva
 
 ## Autor
 
-**Kislley Rodrigues** — Wazuh Ambassador | Detection Engineering | Blue Team
+**Kislley Rodrigues** - Wazuh Ambassador | Detection Engineering | Blue Team
 
 ---
 
