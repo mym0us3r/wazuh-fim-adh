@@ -15,9 +15,9 @@ Conteúdo de Detection Engineering para Wazuh 4.14.8 cobrindo três capacidades 
 
 **1. Regras de correlação de anomalia** - detecção baseada em threshold para operações massivas de arquivo (preparação de ransomware, anti-forense, entrega em massa de droppers) usando regras de correlação com `<if_matched_group>`. Sem dependências externas.
 
-**2. FIM Alert Investigation** - painel de investigação assistida por IA integrado ao WAZUH-Process-Tree-Viewer. Quando um alerta FIM chega, o analista abre o painel, seleciona o alerta e aciona o Claude Sonnet 4.6 com contexto completo: evento focal, eventos de arquivo/registro/processo nos ±60s no mesmo agente, e resultados do pipeline FIM AI. O LLM raciocina sobre comportamento e entrega veredito, técnicas MITRE com confiança e ações recomendadas.
+**2. FIM Alert Investigation** - painel de investigação assistida por IA integrado ao WAZUH-Process-Tree-Viewer. Quando um alerta FIM chega, o analista abre o painel, seleciona o alerta e aciona o Claude Sonnet 4.6 com contexto completo: evento focal, eventos de arquivo/registro/processo nos ±60s no mesmo agente, e alertas de correlação de anomalia. O LLM raciocina sobre comportamento e entrega veredito, técnicas MITRE com confiança e ações recomendadas.
 
-**3. Configuração hardened de endpoints** - `ossec.conf` validado em produção para Windows e Linux com paths explícitos por usuário, `whodata` em diretórios de sistema e `realtime` em paths do usuário. Inclui correções para seis pontos de falha não documentados no handbook oficial.
+**3. Configuração hardened de endpoints** - `ossec.conf` validado em produção para Windows e Linux com paths explícitos por usuário, `whodata` em diretórios de sistema e `realtime` em paths do usuário. Inclui correções para pontos de falha não documentados no handbook oficial.
 
 Desenvolvido como parte do [Programa Wazuh Ambassador](https://wazuh.com/ambassadors-program/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
 
@@ -39,10 +39,9 @@ FIM em tempo real sem contexto:
 
 FIM Alert Investigation (este repositório):
   arquivo criado 19:25:23 → FIM detecta (regra 554)
-  19:25:29 → YARA match: FIM_AI_Lab_Test
-  19:25:39 → Claude Sonnet 4.6: VT 0/0, score=35, zone=medium
-  latência total FIM-to-verdict: 16 segundos
-  analista recebe alerta enriquecido com veredito e contexto comportamental
+  analista abre o painel → seleciona alerta → aciona Claude Sonnet 4.6
+  contexto ±60s: arquivo, registro, processo correlacionados
+  veredito estruturado: risk_score, MITRE ATT&CK, IOCs, ações recomendadas
 ```
 
 ---
@@ -53,8 +52,8 @@ Extensão do [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Proce
 
 ```
 Nginx:
-  /wptv/              → Flask :5000 (WPTV - árvore de processos)
-  /fim-investigation/ → Flask :5000 (FIM Alert Investigation)
+  /wptv/  → Flask :5000 (WPTV - árvore de processos)
+  /fim/   → Flask :5000 (FIM Alert Investigation)
 ```
 
 ### Arquitetura
@@ -70,7 +69,6 @@ Nginx:
 │         wazuh-alerts-*                                      │
 │         Regras: 550/553/554/517 (arquivo)                   │
 │                 594-752 (registro)                          │
-│                 70000-70015 (FIM AI)                        │
 │                 100300-100304 (anomalia)                    │
 │                      │                                      │
 │  Analista seleciona alerta → GET /api/fim/context           │
@@ -80,7 +78,6 @@ Nginx:
 │         - Eventos de registro (Windows)                     │
 │         - Processos (auditd SYSCALL / EventID 4688)         │
 │           via wazuh-archives-*                              │
-│         - Resultados do pipeline FIM AI                     │
 │         - Alertas de anomalia                               │
 │                      │                                      │
 │  Analista clica 'Investigate with AI'                       │
@@ -101,7 +98,6 @@ Nginx:
 |-------|--------|-----------|
 | A - Arquivo | 550, 553, 554, 517 | Modificado, excluído, adicionado, auditoria |
 | B - Registro | 594, 597, 598, 750, 751, 752 | Chaves e valores de registro Windows |
-| C - FIM AI | 70000, 70001, 70002, 70010-70015 | Pipeline FIM AI (YARA, Defender, confiança média/alta) |
 | D - Anomalia | 100300-100304 | Correlação de volume (ransomware, anti-forense) |
 
 ### Saída validada
@@ -142,7 +138,6 @@ Veredito LLM:
 wazuh-fim-adh/
 │
 ├── rules/
-│   ├── fim_ai_rules.xml              # Regras 70000-70015 - pipeline FIM AI
 │   └── fim_anomaly_rules.xml         # Regras 100300-100304 - correlação de anomalia
 │
 ├── decoders/
@@ -154,15 +149,16 @@ wazuh-fim-adh/
 │   ├── ossec_agent_windows.conf      # ossec.conf do agente Windows - paths + ignores
 │   └── ossec_agent_linux.conf        # ossec.conf do agente Linux - whodata + realtime
 │
-├── wptv-fim/
-│   ├── logic_fim.py                  # Lógica de investigação FIM (extensão do WPTV)
-│   ├── server.py                     # Servidor WPTV estendido com rotas /api/fim/*
-│   └── public/fim.html               # Painel FIM Alert Investigation
+├── wptv-fim/                         # Extensão do WAZUH-Process-Tree-Viewer
+│   ├── logic_fim.py                  # Novo - lógica de investigação FIM (_enrich_intel, analyze_fim_context)
+│   ├── server.py                     # Substitui server.py do WPTV - adiciona rotas /api/fim/*
+│   └── public/
+│       └── fim.html                  # Novo - painel FIM Alert Investigation (aba Forensics)
 │
 ├── docs/
 │   ├── fim_alert_investigation_panel.png
 │   ├── fim_ai_verdict_example.png
-│   └── wazuh-fim-documentacao-completa-pt-br.docx   # Handbook completo (PT-BR, 62 páginas)
+│   └── wazuh-fim-documentacao-completa-pt-br.docx   # Handbook completo (PT-BR)
 │
 └── ROADMAP.md
 ```
@@ -176,10 +172,7 @@ wazuh-fim-adh/
 | Wazuh Server | 4.14.8 - WZ-SRV, Ubuntu 24.04 LTS, 3.9 GB RAM |
 | Agente Windows | 4.14.8 - LABDESK, Windows 11 Pro build 26200, usuário `kr` |
 | Agente Linux | 4.14.8 - labnix, Ubuntu 24.04.5, kernel 6.17.0, usuário `kr` |
-| YARA | 4.5.5 - `winget install VirusTotal.YARA` (Windows) / `apt install yara` (Linux) |
-| Windows Defender | integrado via PowerShell - scan sob demanda pelo pipeline |
-| Ruleset YARA | Valhalla demo - CC-BY-NC 4.0 |
-| Inteligência | VirusTotal, AlienVault OTX, URLScan.io, Anthropic (Claude Sonnet 4.6) |
+| Inteligência | Anthropic (Claude Sonnet 4.6) |
 | WPTV | [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer) |
 
 ---
@@ -204,9 +197,9 @@ DEST=/usr/share/wazuh-dashboard/plugins/process_tree_api
 cp $DEST/server.py $DEST/server.py.bak-$(date +%Y%m%d)
 
 # Deploy
-cp wptv-fim/logic_fim.py  $DEST/logic_fim.py
-cp wptv-fim/server.py     $DEST/server.py
-cp wptv-fim/public/fim.html $DEST/public/fim.html
+cp wptv-fim/logic_fim.py      $DEST/logic_fim.py
+cp wptv-fim/server.py         $DEST/server.py
+cp wptv-fim/public/fim.html   $DEST/public/fim.html
 
 # Permissões
 chown wazuh-dashboard:wazuh-dashboard \
@@ -218,45 +211,62 @@ chmod 644 $DEST/public/fim.html
 echo "WPTV_ANTHROPIC_API_KEY=<sua_chave>" >> /etc/wazuh-process-tree/wptv.env
 echo "WPTV_ARCHIVE_INDEX=wazuh-archives-*" >> /etc/wazuh-process-tree/wptv.env
 
-# Nginx - adicionar location /fim-investigation/
-# (mesmo padrão do /wptv/ no arquivo de site existente)
-
 # Reiniciar
 systemctl restart wazuh-process-tree
 ```
 
-### Nginx - adicionar ao site existente
+### Nginx - /etc/nginx/sites-enabled/wptv
 
 ```nginx
-location /fim-investigation/ {
-    proxy_pass              https://127.0.0.1:5000;
-    proxy_ssl_verify        off;
-    proxy_set_header        Host $host;
-    proxy_set_header        X-Real-IP $remote_addr;
-    proxy_read_timeout      120s;
-}
+server {
+    listen 443 ssl;
+    server_name 192.168.1.10; # Adjust to your server IP or FQDN
 
-location /api/fim/ {
-    proxy_pass              https://127.0.0.1:5000;
-    proxy_ssl_verify        off;
-    proxy_set_header        Host $host;
-    proxy_set_header        X-Real-IP $remote_addr;
-    proxy_read_timeout      120s;
+    # Restrict HTTPS access to your public IP
+    allow 192.168.1.8;
+    deny all;
+
+    ssl_certificate     /etc/wazuh-dashboard/certs/wazuh-dashboard.pem;
+    ssl_certificate_key /etc/wazuh-dashboard/certs/wazuh-dashboard-key.pem;
+
+    # Allow large POST bodies (FIM/WPTV analysis payloads can exceed the 1MB default)
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass              https://127.0.0.1:5601;
+        proxy_ssl_verify        off;
+        proxy_set_header        Host $host;
+        proxy_set_header        X-Real-IP $remote_addr;
+        proxy_read_timeout      120s;
+    }
+
+    location /wptv/ {
+        proxy_pass              https://127.0.0.1:5000/;
+        proxy_ssl_verify        off;
+        proxy_set_header        Host $host;
+        proxy_set_header        X-Real-IP $remote_addr;
+        proxy_read_timeout      120s;
+    }
+
+    location /fim/ {
+        proxy_pass              https://127.0.0.1:5000;
+        proxy_ssl_verify        off;
+        proxy_set_header        Host $host;
+        proxy_set_header        X-Real-IP $remote_addr;
+        proxy_read_timeout      120s;
+    }
+
+    location /api/fim/ {
+        proxy_pass              https://127.0.0.1:5000;
+        proxy_ssl_verify        off;
+        proxy_set_header        Host $host;
+        proxy_set_header        X-Real-IP $remote_addr;
+        proxy_read_timeout      120s;
+    }
 }
 ```
 
----
-
-## Achados Técnicos do Lab
-
-Seis achados documentados durante a implantação. Todos reproduzíveis e relevantes para qualquer deploy Wazuh em ambiente Windows e Linux.
-
-1. **Loop PyInstaller `--onefile` via `C:\Windows\Temp`** - `--runtime-tmpdir` obrigatório para executáveis Python compilados no Windows. Sem ele: 3335 alertas em três horas, 43-124 alertas/minuto.
-2. **Loop via perfil PowerShell da conta SYSTEM** - scripts de scan regravavam `StartupProfileData-NonInteractive`. Adicionar `<ignore>` específico no `ossec.conf` do agente resolve.
-3. **Executável de scan Windows requer `.exe`** - `.bat` e `.ps1` não recebem stdin do execd de forma confiável no Windows (erro 1317). PyInstaller resolve.
-4. **`field name="file"` e não `syscheck.path`** - campo correto para matching de path em regras FIM customizadas. Erro silencioso: analysisd não reporta falha.
-5. **Saturação do syscheck por fontes de ruído** - Chrome `.crdownload`, Trend Micro, Sublime Text. Filtrar via `<ignore>` com `type="sregex"` no `ossec.conf` do agente.
-6. **auditpol obrigatório para whodata em workgroup Windows** - sem política de auditoria em Êxito, o SACL é invalidado silenciosamente pelo Windows Defender. O Wazuh emite erro 6021.
+> `client_max_body_size 10m` obrigatório: o payload do `POST /api/fim/analyze` (evento focal + file_events + process_events) ultrapassa o limite default de 1MB do nginx. Sem isso, nginx devolve HTTP 413 antes de repassar ao Flask.
 
 ---
 
@@ -266,9 +276,6 @@ Seis achados documentados durante a implantação. Todos reproduzíveis e releva
 - [Regras FIM customizadas](https://documentation.wazuh.com/current/user-manual/capabilities/file-integrity/creating-custom-fim-rules.html)
 - [Configuração syscheck](https://documentation.wazuh.com/current/user-manual/reference/ossec-conf/syscheck.html)
 - [Release notes 4.14.8](https://documentation.wazuh.com/current/release-notes/release-4-14-8.html)
-- [PyInstaller - `--runtime-tmpdir`](https://pyinstaller.org/en/stable/usage.html)
-- [PyInstaller - How the One-File Program Works](https://pyinstaller.org/en/stable/operating-mode.html)
-- [Valhalla YARA Rule Set](https://valhalla.nextron-systems.com/) (Nextron Systems, CC-BY-NC 4.0)
 - [MITRE ATT&CK T1204.002 - Malicious File](https://attack.mitre.org/techniques/T1204/002/)
 - [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer)
 - [DIRTY-FRAG Detection with Wazuh 4.14.4](https://github.com/mym0us3r/DIRTY-FRAG-Detection-with-Wazuh-4.14.4)
@@ -285,11 +292,10 @@ Seis achados documentados durante a implantação. Todos reproduzíveis e releva
 ## Agradecimentos
 
 - **Equipe Wazuh** pela plataforma SIEM/XDR open source e pelo Programa Ambassador
-- **Nextron Systems** pelo Valhalla YARA Rule Set (tier demo, CC-BY-NC 4.0)
 
 ---
 
-*Regras de detecção, decoders, painel FIM Alert Investigation e configurações de agente validados no Wazuh 4.14.8, Windows 11 Pro build 26200, Ubuntu 24.04.5 kernel 6.17.0, PyInstaller 6.22.3, YARA 4.5.5, Windows Defender e Claude Sonnet 4.6.*
+*Regras de detecção, decoders, painel FIM Alert Investigation e configurações de agente validados no Wazuh 4.14.8, Windows 11 Pro build 26200, Ubuntu 24.04.5 kernel 6.17.0, Claude Sonnet 4.6.*
 
 ---
 
