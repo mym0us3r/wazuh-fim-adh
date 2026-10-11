@@ -124,6 +124,8 @@ Nginx:
 
 The LLM receives the event context, never the file content.
 
+**Data access:** WPTV and FIM Alert Investigation read from the Wazuh Indexer with the dedicated read-only service user `wptv_svc` (indices `wazuh-alerts-*` and `wazuh-archives-*`). The credentials live in `/etc/wazuh-process-tree/wptv.env` (mode `600`, owner `wazuh-dashboard`). See [Step 3](#step-3---wazuh-indexer-credentials-service-user-wptv_svc).
+
 ---
 
 ## Anomaly Correlation Rules
@@ -228,8 +230,9 @@ wazuh-fim-adh/
 
 - Wazuh Server 4.14.8 and agents 4.14.8
 - Python 3.10+ on the server (for `logic_fim.py`)
+- [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer) installed (`/usr/share/wazuh-dashboard/plugins/process_tree_api/`)
+- Wazuh Indexer read-only service user `wptv_svc` (role `wptv_role`) with access to `wazuh-alerts-*` and `wazuh-archives-*` (Step 3)
 - API keys: VirusTotal, AlienVault OTX, AbuseIPDB and Anthropic, stored in `/etc/wazuh-process-tree/wptv.env`
-- WAZUH-Process-Tree-Viewer installed (`/usr/share/wazuh-dashboard/plugins/process_tree_api/`)
 - Filebeat with the archives module enabled (`archives.enabled: true` in `filebeat.yml`)
 - `logall_json: yes` in the server `ossec.conf`, required for process context in the panel
 
@@ -263,7 +266,87 @@ auditpol /set /subcategory:"File System" /success:enable
 auditpol /set /subcategory:"Handle Manipulation" /success:enable
 ```
 
-### Step 3 - FIM Alert Investigation
+### Step 3 - Wazuh Indexer credentials (service user `wptv_svc`)
+
+WPTV and FIM Alert Investigation are served by the same Flask service (`wazuh-process-tree`, running as `wazuh-dashboard`; FIM adds the `/fim/` and `/api/fim/*` routes) and query the **Wazuh Indexer directly** as their primary data source. They never use the `admin` account. Create a dedicated **read-only** service user, `wptv_svc`, restricted to:
+
+- `wazuh-alerts-*` - events that triggered a rule (FIM alerts, including 100310 and 100300-100304).
+- `wazuh-archives-*` - events that did not trigger a rule, including the process events used for the ±60 s context. Requires the Filebeat archives module (see Requirements).
+
+The role grants only `read` and `indices:data/read/search`, with no write permission on any index. The `admin` credentials are used once, to create the role and the user.
+
+Create the role:
+
+```bash
+curl -sk -X PUT "https://127.0.0.1:9200/_plugins/_security/api/roles/wptv_role" \
+  -H "Content-Type: application/json" \
+  -u "admin:<admin_password>" \
+  -d '{
+    "cluster_permissions": [
+      "cluster:monitor/main"
+    ],
+    "index_permissions": [{
+      "index_patterns": [
+        "wazuh-alerts-*",
+        "wazuh-archives-*"
+      ],
+      "allowed_actions": [
+        "read",
+        "indices:data/read/search"
+      ]
+    }]
+  }'
+```
+
+Create the user:
+
+```bash
+curl -sk -X PUT "https://127.0.0.1:9200/_plugins/_security/api/internalusers/wptv_svc" \
+  -H "Content-Type: application/json" \
+  -u "admin:<admin_password>" \
+  -d '{
+    "password": "<your_password>",
+    "backend_roles": [],
+    "attributes": {}
+  }'
+```
+
+Map the role to the user:
+
+```bash
+curl -sk -X PUT "https://127.0.0.1:9200/_plugins/_security/api/rolesmapping/wptv_role" \
+  -H "Content-Type: application/json" \
+  -u "admin:<admin_password>" \
+  -d '{
+    "users": ["wptv_svc"]
+  }'
+```
+
+Then store the credentials. The service loads this file through `EnvironmentFile` in its systemd unit:
+
+```bash
+mkdir -p /etc/wazuh-process-tree/certs
+cp /etc/wazuh-indexer/certs/root-ca.pem /etc/wazuh-process-tree/certs/
+vim /etc/wazuh-process-tree/wptv.env
+```
+
+```
+WPTV_INDEXER_URL=https://127.0.0.1:9200
+WPTV_INDEXER_INDEX=wazuh-alerts-*
+WPTV_INDEXER_USER=wptv_svc
+WPTV_INDEXER_PASSWORD=<your_password>
+WPTV_INDEXER_CA_CERT=/etc/wazuh-process-tree/certs/root-ca.pem
+WPTV_ARCHIVE_INDEX=wazuh-archives-*
+```
+
+```bash
+chown wazuh-dashboard:wazuh-dashboard /etc/wazuh-process-tree/wptv.env
+chmod 600 /etc/wazuh-process-tree/wptv.env
+```
+
+> `/etc/wazuh-process-tree/wptv.env` holds the Indexer password and the API keys. Keep it at mode `600`, owned by `wazuh-dashboard`, and never commit it to version control. The complete WPTV installation (virtual environment, permissions, nginx, OSD plugin, systemd unit) is in the [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer) repository.
+
+### Step 4 - FIM Alert Investigation
 
 ```bash
 DEST=/usr/share/wazuh-dashboard/plugins/process_tree_api
@@ -282,15 +365,14 @@ chown wazuh-dashboard:wazuh-dashboard \
 chmod 755 $DEST/logic_fim.py $DEST/server.py
 chmod 644 $DEST/public/fim.html
 
-# wptv.env - add the Anthropic key and the archives index
+# wptv.env - add the Anthropic key (the Indexer variables were set in Step 3)
 echo "WPTV_ANTHROPIC_API_KEY=<your_key>" >> /etc/wazuh-process-tree/wptv.env
-echo "WPTV_ARCHIVE_INDEX=wazuh-archives-*" >> /etc/wazuh-process-tree/wptv.env
 
 # Restart
 systemctl restart wazuh-process-tree
 ```
 
-### Step 4 - Nginx (`/etc/nginx/sites-enabled/wptv`)
+### Step 5 - Nginx (`/etc/nginx/sites-enabled/wptv`)
 
 ```nginx
 server {
@@ -352,11 +434,13 @@ server {
 The alert may be hidden by the proxy rule (AC-7). The source of truth is `archives.json`, which requires `logall_json: yes`. On the manager:
 
 ```bash
-grep '"syscheck"' /var/ossec/logs/archives/archives.json \
+grep -a '"syscheck"' /var/ossec/logs/archives/archives.json \
   | jq -c '{timestamp, agent:.agent.name, rule:.rule.id, mode:.syscheck.mode, event:.syscheck.event, path:.syscheck.path}'
 ```
 
 The `mode` field is `realtime`, `whodata` or `scheduled`. An `added` event with `rule: null` indicates a creation hidden by the proxy at level 0 (finding AC-7), not a lost event.
+
+For earlier days, the manager rotates the file to `/var/ossec/logs/archives/YYYY/Mon/ossec-archive-DD.json.gz`; use `zcat -f <file> | grep -a '"syscheck"' | jq ...` on it. `grep -a` avoids the `binary file matches` message.
 
 ### Create, modify and delete test
 
@@ -529,6 +613,7 @@ Wazuh Ambassador | Detection Engineering | Blue Team
 |---|---|
 | Hypothesis AP-1 refuted | The suspected stall of the `syscheckd` inotify reader on labnix was not confirmed: realtime delivers events (41 events in the window, 36 in realtime mode). Not an upstream issue. |
 | Handbook revised | 53 pages, 15 validated findings and 1 refuted hypothesis, with 9 new Wazuh Discover screenshots and a caption on every figure. |
+| Indexer access documented | WPTV and FIM Alert Investigation query the Wazuh Indexer with the read-only service user `wptv_svc` (role `wptv_role`, indices `wazuh-alerts-*` and `wazuh-archives-*`). Credentials in `/etc/wazuh-process-tree/wptv.env`. |
 | Verification rule | Confirm realtime through `syscheck.mode` in `archives.json`, use `strace -y` including `pselect6`, and do not query the live `fim.db`. |
 
 ---
