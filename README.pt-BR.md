@@ -503,6 +503,14 @@ Validada em LABDESK (02:14:29 e 02:13:56 de 10/10/2026) e em labnix (02:30:14 e 
 
 O script `up.ps1` executou três fases no LABDESK: staging, reconhecimento (11 comandos) e cópia lateral. Resultado: 44 alertas FIM, regra 100302 disparada, correlação FIM + árvore de processos (EventID 4688) confirmada.
 
+O painel lista a regra proxy 100310 (nível 5) ao lado do alerta de correlação 100302, de modo que a criação do `up.ps1` pode ser analisada a partir do alerta que de fato chega a `wazuh-alerts-*` (achado AC-7). Os valores do veredito variam com o alerta focal e a janela de contexto: esta execução parte do alerta de criação (risk_score 92), enquanto a execução mais abaixo parte da 100302 (risk_score 87).
+
+![Alerta focal na regra proxy 100310 (nível 5): up.ps1 criado em Downloads no LABDESK, modo whodata, 2026-10-10 às 03:13:01](docs/ev_fim_investigation_focal_100310_labdesk.png)
+
+![Veredito do LLM para o alerta focal 100310: risk_score 92, CRITICAL, mapeamento MITRE liderado por T1059.001 (97%)](docs/ev_fim_investigation_veredito_risk_92.png)
+
+Partindo, em vez disso, do alerta de escalação 100302:
+
 ![Contexto de 14 eventos no janelamento de ±60 s](docs/ev_fim_investigation_context_14_eventos.png)
 
 ![Alerta focal 100302](docs/ev_fim_investigation_focal_alert_100302.png)
