@@ -503,9 +503,17 @@ Validated on LABDESK (2026-10-10 at 02:14:29 and 02:13:56) and on labnix (02:30:
 
 The `up.ps1` script ran three phases on LABDESK: staging, reconnaissance (11 commands) and lateral copy. Result: 44 FIM alerts, rule 100302 fired, FIM + process tree correlation (EventID 4688) confirmed.
 
-![14-event context in the ±60 s window](docs/ev_fim_investigation_context_14_eventos.png)
+The panel lists the proxy rule 100310 (level 5) next to the correlation alert 100302, so the creation of `up.ps1` can be analyzed from the alert that actually reaches `wazuh-alerts-*` (finding AC-7). Verdict values vary with the focal alert and the context window: this run starts from the creation alert (risk_score 92), while the run further below starts from 100302 (risk_score 87).
 
-![Focal alert 100302](docs/ev_fim_investigation_focal_alert_100302.png)
+![Focal alert on proxy rule 100310 (level 5): up.ps1 created in Downloads on LABDESK, whodata mode, 2026-10-10 at 03:13:01](docs/ev_fim_investigation_focal_100310_labdesk.png)
+
+![LLM verdict for the 100310 focal alert: risk_score 92, CRITICAL, MITRE mapping led by T1059.001 (97%)](docs/ev_fim_investigation_veredito_risk_92.png)
+
+Starting from the escalation alert 100302 instead:
+
+![14-event context in the ±60 s window](docs/FIM AI Veredict.png)
+
+![Focal alert 100302](docs/FIM AI.png)
 
 ![LLM verdict - risk_score 87, CRITICAL, 11 MITRE techniques](docs/ev_fim_investigation_veredito_risk_87.png)
 
