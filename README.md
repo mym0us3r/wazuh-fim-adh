@@ -29,7 +29,7 @@ This repository documents a lab project that went from the problem to the soluti
 
 **3. Hardened endpoint configuration.** A validated `ossec.conf` for Windows and Linux, with explicit per-user paths, `whodata` on system directories and `realtime` on user paths, plus the technical findings that the official material does not cover.
 
-All of it is consolidated in the **Handbook** (53 pages, PT-BR), in [`docs/`](docs/). An EN-US edition is on the [ROADMAP](ROADMAP.md).
+All of it is consolidated in the **Handbook** (53 pages, PT-BR), in [`docs/`](docs/).
 
 > Developed as part of the [Wazuh Ambassador Program](https://wazuh.com/ambassadors-program/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
 
@@ -220,8 +220,7 @@ wazuh-fim-adh/
 │   └── ev_*.png                      # Wazuh Discover and panel evidence
 │
 ├── README.md                         # English
-├── README.pt-BR.md                   # Português (BR)
-└── ROADMAP.md
+└── README.pt-BR.md                   # Português (BR)
 ```
 
 ---
@@ -511,9 +510,9 @@ The panel lists the proxy rule 100310 (level 5) next to the correlation alert 10
 
 Starting from the escalation alert 100302 instead:
 
-![14-event context in the ±60 s window](docs/FIM AI Veredict.png)
+![14-event context in the ±60 s window](docs/ev_fim_investigation_context_14_eventos.png)
 
-![Focal alert 100302](docs/FIM AI.png)
+![Focal alert 100302](docs/ev_fim_investigation_focal_alert_100302.png)
 
 ![LLM verdict - risk_score 87, CRITICAL, 11 MITRE techniques](docs/ev_fim_investigation_veredito_risk_87.png)
 
@@ -575,7 +574,7 @@ The Handbook is written in PT-BR. Chapters:
 
 ## Validation Limits
 
-- The formal controlled-threshold test of rules 100300 to 100304, with documented scenarios on LABDESK and labnix, is an open step (see [ROADMAP.md](ROADMAP.md)). Current evidence comes from simulation scripts and real indexed alerts.
+- The formal controlled-threshold test of rules 100300 to 100304, with documented scenarios on LABDESK and labnix, is an open step. Current evidence comes from simulation scripts and real indexed alerts.
 - Rule 100301 was not confirmed on Windows.
 - The correlation parameters are lab values and require a baseline in production.
 - The 60 s `syscheck frequency` is a lab value used to speed up validation.
