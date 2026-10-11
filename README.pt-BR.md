@@ -1,0 +1,624 @@
+# Wazuh FIM em Profundidade - O Handbook do Defensor Avançado
+
+[English](README.md) | **Português (BR)**
+
+> **Detection engineering sobre o File Integrity Monitoring do Wazuh 4.14.8 · Windows e Linux · correlação de anomalia + investigação assistida por IA**
+
+![custom_rules](https://img.shields.io/badge/regras_customizadas-6-brightgreen)
+![findings](https://img.shields.io/badge/achados_validados-15-blue)
+![refuted](https://img.shields.io/badge/hip%C3%B3tese_refutada-1-lightgrey)
+![status](https://img.shields.io/badge/status-validado_em_laborat%C3%B3rio-success)
+![wazuh](https://img.shields.io/badge/wazuh-4.14.8-005571)
+![platform](https://img.shields.io/badge/plataforma-Windows%20%7C%20Linux-lightgrey)
+![mitre](https://img.shields.io/badge/MITRE-T1565-red)
+![mitre](https://img.shields.io/badge/MITRE-T1485-red)
+![mitre](https://img.shields.io/badge/MITRE-T1486-red)
+![mitre](https://img.shields.io/badge/MITRE-T1105-red)
+
+---
+
+## O que é este projeto?
+
+O módulo FIM do Wazuh responde com precisão a três perguntas: **o que mudou, quando mudou e, com whodata, quem mudou**. Em produção, a maioria dos problemas de cobertura nasce em outro lugar: no subsistema de auditoria do sistema operacional por baixo do FIM, no comportamento interno do `wazuh-analysisd` ao correlacionar eventos e em falhas silenciosas que o `ossec.conf` não revela.
+
+Este repositório documenta um projeto de laboratório que foi do problema até a solução, com evidência em cada etapa. Ele entrega três capacidades construídas sobre o motor nativo de FIM:
+
+**1. Regras de correlação de anomalia.** Detecção por threshold para operações massivas de arquivo (preparação de ransomware, anti-forense, entrega em massa de droppers), com `<if_matched_group>` e `<if_matched_sid>`. Seis regras customizadas, sem dependências externas.
+
+**2. FIM Alert Investigation.** Painel de investigação assistida por IA integrado ao [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer). O analista seleciona um alerta FIM e aciona o Claude Sonnet 4.6 com o contexto completo (±60 s, mesmo agente). O resultado é um veredito estruturado com `risk_score`, técnicas MITRE com confiança, IOCs e ações recomendadas.
+
+**3. Configuração endurecida de endpoints.** `ossec.conf` validado para Windows e Linux, com caminhos explícitos por usuário, `whodata` em diretórios de sistema e `realtime` em caminhos de usuário, mais os achados técnicos que o material oficial não cobre.
+
+Tudo isso está consolidado no **Handbook** (53 páginas, PT-BR), em [`docs/`](docs/).
+
+> Desenvolvido como parte do [Programa Wazuh Ambassador](https://wazuh.com/ambassadors-program/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
+
+---
+
+## Ambiente de Referência
+
+| Componente | Plataforma | Papel |
+|---|---|---|
+| WZ-SRV | Ubuntu 24.04 LTS, 3,9 GB de RAM, Wazuh 4.14.8 | Manager, Indexer, Dashboard e WPTV (Flask) |
+| LABDESK | Windows 11 Pro (build 26200), agente 4.14.8 | Agente Windows: FIM em sistema de arquivos e Registro |
+| labnix | Ubuntu 24.04.5, kernel 6.17.0, agente 4.14.8 | Agente Linux atual: realtime, whodata e auditd |
+| pentlab | Kali Linux (kernel 6.x), agente 4.14.5 | Agente Linux das validações iniciais em 4.14.7 |
+| Inteligência | Claude Sonnet 4.6, VirusTotal, AlienVault OTX, AbuseIPDB | Análise e enriquecimento do FIM Alert Investigation |
+
+Parte dos cenários de correlação foi executada em 4.14.7 e o pipeline atual opera em 4.14.8. Os números de volume e latência refletem um servidor de 3,9 GB de RAM e não substituem um dimensionamento de produção.
+
+---
+
+## Por que FIM avançado?
+
+```
+Scan agendado:
+  lê arquivo -> calcula hash -> compara -> alerta na mudança
+  problema: tudo que acontece entre scans é invisível
+
+FIM em tempo real sem contexto:
+  arquivo criado às 14:32:07 -> alerta disparado
+  analista revisa às 14:45 -> arquivo já executado ou deletado
+  problema: detecção sem contexto é ruído
+
+FIM Alert Investigation (este repositório):
+  arquivo criado -> FIM detecta (regra 554, exibida como 100310)
+  analista seleciona o alerta -> aciona o Claude Sonnet 4.6
+  contexto ±60 s: arquivo, registro e processo correlacionados
+  veredito: risk_score, MITRE ATT&CK, IOCs, ações recomendadas
+```
+
+---
+
+## A História do Projeto
+
+O projeto seguiu quatro etapas. Cada uma gerou achados que alteraram a etapa seguinte.
+
+**Etapa 1 - Detectar comportamento, não só mudança.** Um alerta isolado de criação de arquivo diz pouco. A pergunta passou a ser "quantos, em quanto tempo, no mesmo agente". Surgiram as regras 100300 a 100304, baseadas em volume.
+
+**Etapa 2 - O motor de correlação tem regras próprias.** Duas regras com `<if_matched_sid>` sobre o mesmo SID compartilham o acumulador e interferem entre si (achados AC-3, AC-5 e AC-6). A solução foi a **regra proxy 100310**, filha da 554, que reemite cada criação para dois grupos independentes (`fim_creation` e `fim_new_entry`) e isola os contadores de 100300 e 100301.
+
+**Etapa 3 - Todo mecanismo tem efeito colateral.** A filha 100310 passou a suprimir a regra pai 554 em `wazuh-alerts-*`: só a 100310 chega ao índice. Com a 100310 em nível 0, o alerta some por completo e o evento aparece apenas em `wazuh-archives-*`, sem campo `rule`. A 100310 opera em nível 5 e o painel de investigação passou a tratá-la como regra de arquivo (achado AC-7).
+
+**Etapa 4 - Do alerta ao veredito.** Com a detecção estável, o FIM Alert Investigation fecha o ciclo: contexto de ±60 s, enriquecimento de threat intelligence e análise do LLM. Latência FIM-to-verdict medida em labnix: **16 segundos**.
+
+### Uma hipótese refutada, documentada de propósito
+
+Durante a validação em Linux, uma janela de eventos realtime ausentes no labnix levou à hipótese de que o leitor inotify do `wazuh-syscheckd` estaria parado (stall), o que justificaria uma issue no repositório do Wazuh. Reproduzir antes de reportar mostrou o contrário:
+
+- O `archives.json` do manager registra **41 eventos** do labnix na janela, **36 deles em modo `realtime`**.
+- O `strace` do `syscheckd` mostra `read()` no descritor `anon_inode:inotify`. A observação original havia filtrado a syscall errada: o daemon espera com `pselect6`, que o filtro antigo não capturava.
+- Os 21 eventos `added` sem regra associada são compatíveis com a criação encoberta pela regra proxy 100310 enquanto operava em nível 0 (efeito do achado AC-7), e não com eventos perdidos.
+
+**Veredito: NÃO PROCEDE.** Não é issue no upstream. O achado AP-1 permanece no Handbook como hipótese refutada, com o método e as falhas que a produziram. O aprendizado útil é prático: para confirmar que o realtime entrega eventos, consulte `syscheck.mode` no `archives.json` (ou em `wazuh-archives-*`) e nunca consulte o `fim.db` ativo (retorna `database is locked`).
+
+---
+
+## Arquitetura
+
+```
+Agente (syscheckd)
+  scheduled | realtime (inotify) | whodata (auditd / SACL)
+        |
+        v
+Manager: analysisd
+  regra 554 (added) -> filha 100310 -> grupos fim_creation, fim_new_entry
+  regra 550 (modified) | 553 (deleted) | syscheck_file
+        |
+        v
+Regras de correlação 100300-100304  ->  wazuh-alerts-*
+        |
+        v
+FIM Alert Investigation (WPTV, aba Forensics)
+  GET  /api/fim/alerts   -> lista de alertas FIM
+  GET  /api/fim/context  -> contexto ±60 s (arquivo, registro, processo)
+  POST /api/fim/analyze  -> Claude Sonnet 4.6 -> veredito estruturado
+```
+
+```
+Nginx:
+  /wptv/     -> Flask :5000 (WPTV - árvore de processos)
+  /fim/      -> Flask :5000 (FIM Alert Investigation)
+  /api/fim/  -> Flask :5000 (API do painel FIM)
+```
+
+O LLM recebe o contexto do evento, nunca o conteúdo do arquivo.
+
+**Acesso aos dados:** o WPTV e o FIM Alert Investigation leem do Wazuh Indexer com o usuário de serviço dedicado e somente leitura `wptv_svc` (índices `wazuh-alerts-*` e `wazuh-archives-*`). As credenciais ficam em `/etc/wazuh-process-tree/wptv.env` (modo `600`, dono `wazuh-dashboard`). Ver [Passo 3](#passo-3---credenciais-do-wazuh-indexer-usuário-de-serviço-wptv_svc).
+
+---
+
+## Regras de Correlação de Anomalia
+
+Arquivo: `/var/ossec/etc/rules/fim_anomaly_rules.xml` (permissões `660 wazuh:wazuh`).
+
+| Regra | Nível | Correlação | Gatilho | MITRE |
+|---|---|---|---|---|
+| 100310 | 5 | `if_sid 554` | Proxy: reemite cada criação para `fim_creation` e `fim_new_entry` | - |
+| 100300 | 10 | `if_matched_group fim_creation` | 3+ arquivos criados em 10 min (mesmo agente) | T1565, T1565.001, T1074 |
+| 100301 | 12 | `if_matched_group fim_new_entry` | Mesmo MD5 (`md5_after`) em 3+ diretórios em 10 min | T1105, T1570 |
+| 100302 | 10 | `if_matched_sid 550` | 3+ arquivos modificados em 10 min | T1565, T1565.001 |
+| 100303 | 10 | `if_matched_sid 553` | 3+ arquivos excluídos em 10 min | T1485, T1070, T1561 |
+| 100304 | 14 | `if_matched_group syscheck_file` | 5+ eventos mistos em 10 min | T1485, T1486, T1565 |
+
+> **Nota técnica 1:** `<if_sid>` define uma regra filha (dispara no mesmo evento). `<if_matched_sid>` define correlação temporal (contador independente, `frequency` eventos dentro do `timeframe`). A 100310 usa o primeiro mecanismo para que 100300 e 100301 usem o segundo sobre grupos distintos.
+
+> **Nota técnica 2:** `<if_matched_sid>` com SIDs separados por vírgula não funciona em regras de correlação no Wazuh 4.14.x. A 100304 usa `<if_matched_group>syscheck_file</if_matched_group>` para cobrir 550, 553 e 554 em uma única correlação.
+
+> **Aviso de calibração:** `frequency="3"`, `timeframe="600"` e `ignore="30"` foram calibrados para laboratório. Em produção, ajuste contra um baseline de atividade normal por grupo de agentes.
+
+### Matriz de validação
+
+| Regra | Cenário | LABDESK (Windows) | pentlab (Linux) |
+|---|---|---|---|
+| 100310 | Proxy de isolamento (nível 5) | CONFIRMADO | - (validada em labnix) |
+| 100300 | 3+ criações em 10 min | CONFIRMADO | CONFIRMADO |
+| 100301 | Mesmo hash, diretórios distintos | NÃO CONFIRMADO | CONFIRMADO |
+| 100302 | 3+ modificações em 10 min | CONFIRMADO | CONFIRMADO |
+| 100303 | 3+ exclusões em 10 min | CONFIRMADO | CONFIRMADO |
+| 100304 | 5+ eventos mistos (nível 14) | CONFIRMADO | CONFIRMADO |
+
+Na regra 100301 em Windows, o `same_field` sobre campos `syscheck` não foi confirmado nos testes de 16/09/2026. Os endpoints Windows mantêm cobertura de criação via 100300 e de escalação via 100304.
+
+---
+
+## Achados Técnicos
+
+Quinze achados validados e uma hipótese refutada, todos com evidência de laboratório. O detalhamento (comportamento, impacto, mitigação) está no capítulo 10 do Handbook.
+
+| ID | Achado | Tipo | Status |
+|---|---|---|---|
+| AC-1 | `same_field` deve usar `md5_after` | Correlação | RESOLVIDO |
+| AC-2 | `if_matched_sid` com múltiplos SIDs não é confiável | Correlação | RESOLVIDO |
+| AC-3 | Interferência de contador entre 100300 e 100301 | Correlação | RESOLVIDO |
+| AC-4 | `wazuh-logtest` não processa eventos syscheck | Validação | ESPERADO |
+| AC-5 | Interferência de contador confirmada no Linux | Correlação | RESOLVIDO |
+| AC-6 | Interferência filho-pai na 100300 | Correlação | RESOLVIDO |
+| AC-7 | Nível da 100310 e supressão da 554 | Correlação | RESOLVIDO |
+| AO-1 | `field name="file"` e não `syscheck.path` | Regras | RESOLVIDO |
+| AO-2 | Saturação do syscheck por fontes de ruído | Endpoint | RESOLVIDO |
+| AO-3 | `auditpol` obrigatório para whodata em workgroup Windows | Endpoint | RESOLVIDO |
+| AO-4 | `client_max_body_size` do nginx para payloads de análise | Integração | RESOLVIDO |
+| AO-5 | AbuseIPDB só é consultado via `connect` do auditd | Integração | RESOLVIDO |
+| AO-6 | VirusTotal não detecta payloads customizados | Integração | ESPERADO |
+| AO-7 | `windows_audit_interval` não recupera a SACL após restart do manager | Windows | MITIGADO |
+| AO-8 | Caminho com `/*` expande o glob em arquivos individuais | Endpoint | RESOLVIDO |
+| AP-1 | Hipótese de stall do leitor inotify (refutada) | Daemon Linux | NÃO PROCEDE |
+
+Dois achados merecem atenção imediata em qualquer implantação, porque degradam a cobertura sem registrar erro:
+
+- **AO-7 (Windows):** após reiniciar o manager, a SACL do whodata não é reaplicada pelo `windows_audit_interval`. No LABDESK o gap foi de cerca de 25 minutos sem cobertura whodata, até um `Restart-Service WazuhSvc` manual. Mitigação: reiniciar o agente após o restart do manager.
+- **AO-8 (Linux):** `<directories>` com `/*` registra watches em arquivos individuais e deixa os arquivos novos sem cobertura realtime. Use o diretório sem o curinga. Segundo a [documentação oficial](https://documentation.wazuh.com/current/user-manual/reference/ossec-conf/syscheck.html), o realtime funciona com diretórios, não com arquivos individuais.
+
+---
+
+## Estrutura do Repositório
+
+```
+wazuh-fim-adh/
+│
+├── rules/
+│   └── fim_anomaly_rules.xml         # Regras 100310 + 100300-100304
+│
+├── decoders/
+│   └── fim_ai_decoder.xml            # JSON_Decoder Stage 1 (fim_ai_endpoint)
+│                                     #               Stage 2 (fim_ai_intel)
+│
+├── config/
+│   ├── ossec_server.conf             # ossec.conf do servidor
+│   ├── ossec_agent_windows.conf      # Agente Windows: paths + ignores
+│   └── ossec_agent_linux.conf        # Agente Linux: whodata + realtime
+│
+├── wptv-fim/                         # Extensão do WAZUH-Process-Tree-Viewer
+│   ├── logic_fim.py                  # Lógica de investigação FIM
+│   ├── server.py                     # Rotas /api/fim/*
+│   └── public/
+│       └── fim.html                  # Painel FIM Alert Investigation
+│
+├── docs/
+│   ├── wazuh-fim-advanced-defenders-handbook-pt-br.docx   # Handbook completo (53 páginas)
+│   └── ev_*.png                      # Evidências do Wazuh Discover e do painel
+│
+├── README.md                         # English
+├── README.pt-BR.md                   # Português (BR)
+└── ROADMAP.md
+```
+
+---
+
+## Requisitos
+
+- Wazuh Server 4.14.8 e agentes 4.14.8
+- Python 3.10+ no servidor (para `logic_fim.py`)
+- [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer) instalado (`/usr/share/wazuh-dashboard/plugins/process_tree_api/`)
+- Usuário de serviço somente leitura `wptv_svc` (role `wptv_role`) no Wazuh Indexer, com acesso a `wazuh-alerts-*` e `wazuh-archives-*` (Passo 3)
+- Chaves de API: VirusTotal, AlienVault OTX, AbuseIPDB e Anthropic, armazenadas em `/etc/wazuh-process-tree/wptv.env`
+- Filebeat com o módulo archives habilitado (`archives.enabled: true` em `filebeat.yml`)
+- `logall_json: yes` no `ossec.conf` do servidor, necessário para o contexto de processo no painel
+
+---
+
+## Deploy
+
+### Passo 1 - Regras de correlação
+
+```bash
+cp rules/fim_anomaly_rules.xml /var/ossec/etc/rules/
+chown wazuh:wazuh /var/ossec/etc/rules/fim_anomaly_rules.xml
+chmod 660 /var/ossec/etc/rules/fim_anomaly_rules.xml
+
+# Validar a sintaxe antes de reiniciar
+/var/ossec/bin/wazuh-analysisd -t 2>&1 | tail -5
+
+systemctl restart wazuh-manager
+```
+
+### Passo 2 - Configuração dos agentes
+
+Aplique `config/ossec_agent_linux.conf` ou `config/ossec_agent_windows.conf` ao `ossec.conf` do agente e substitua os placeholders de endereço do manager. Pontos de atenção:
+
+- `whodata` em diretórios de sistema e `realtime` em caminhos de usuário.
+- Diretórios sem `/*` (achado AO-8).
+- Windows em workgroup: habilitar a auditoria de objeto com `auditpol` (achado AO-3).
+
+```cmd
+auditpol /set /subcategory:"File System" /success:enable
+auditpol /set /subcategory:"Handle Manipulation" /success:enable
+```
+
+### Passo 3 - Credenciais do Wazuh Indexer (usuário de serviço `wptv_svc`)
+
+O WPTV e o FIM Alert Investigation são servidos pelo mesmo serviço Flask (`wazuh-process-tree`, executado como `wazuh-dashboard`; o FIM acrescenta as rotas `/fim/` e `/api/fim/*`) e consultam o **Wazuh Indexer diretamente** como fonte primária de dados. Nenhum dos dois usa a conta `admin`. Crie um usuário de serviço dedicado e **somente leitura**, `wptv_svc`, restrito a:
+
+- `wazuh-alerts-*` - eventos que dispararam regra (alertas FIM, incluindo 100310 e 100300-100304).
+- `wazuh-archives-*` - eventos que não dispararam regra, incluindo os eventos de processo usados no contexto de ±60 s. Exige o módulo archives do Filebeat (ver Requisitos).
+
+A role concede apenas `read` e `indices:data/read/search`, sem permissão de escrita em nenhum índice. As credenciais `admin` são usadas uma única vez, para criar a role e o usuário.
+
+Criar a role:
+
+```bash
+curl -sk -X PUT "https://127.0.0.1:9200/_plugins/_security/api/roles/wptv_role" \
+  -H "Content-Type: application/json" \
+  -u "admin:<admin_password>" \
+  -d '{
+    "cluster_permissions": [
+      "cluster:monitor/main"
+    ],
+    "index_permissions": [{
+      "index_patterns": [
+        "wazuh-alerts-*",
+        "wazuh-archives-*"
+      ],
+      "allowed_actions": [
+        "read",
+        "indices:data/read/search"
+      ]
+    }]
+  }'
+```
+
+Criar o usuário:
+
+```bash
+curl -sk -X PUT "https://127.0.0.1:9200/_plugins/_security/api/internalusers/wptv_svc" \
+  -H "Content-Type: application/json" \
+  -u "admin:<admin_password>" \
+  -d '{
+    "password": "<your_password>",
+    "backend_roles": [],
+    "attributes": {}
+  }'
+```
+
+Mapear a role ao usuário:
+
+```bash
+curl -sk -X PUT "https://127.0.0.1:9200/_plugins/_security/api/rolesmapping/wptv_role" \
+  -H "Content-Type: application/json" \
+  -u "admin:<admin_password>" \
+  -d '{
+    "users": ["wptv_svc"]
+  }'
+```
+
+Em seguida, grave as credenciais. O serviço carrega este arquivo pelo `EnvironmentFile` da unit do systemd:
+
+```bash
+mkdir -p /etc/wazuh-process-tree/certs
+cp /etc/wazuh-indexer/certs/root-ca.pem /etc/wazuh-process-tree/certs/
+vim /etc/wazuh-process-tree/wptv.env
+```
+
+```
+WPTV_INDEXER_URL=https://127.0.0.1:9200
+WPTV_INDEXER_INDEX=wazuh-alerts-*
+WPTV_INDEXER_USER=wptv_svc
+WPTV_INDEXER_PASSWORD=<your_password>
+WPTV_INDEXER_CA_CERT=/etc/wazuh-process-tree/certs/root-ca.pem
+WPTV_ARCHIVE_INDEX=wazuh-archives-*
+```
+
+```bash
+chown wazuh-dashboard:wazuh-dashboard /etc/wazuh-process-tree/wptv.env
+chmod 600 /etc/wazuh-process-tree/wptv.env
+```
+
+> `/etc/wazuh-process-tree/wptv.env` guarda a senha do Indexer e as chaves de API. Mantenha o modo `600`, dono `wazuh-dashboard`, e nunca o versione. A instalação completa do WPTV (ambiente virtual, permissões, nginx, plugin do OSD, unit do systemd) está no repositório [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer).
+
+### Passo 4 - FIM Alert Investigation
+
+```bash
+DEST=/usr/share/wazuh-dashboard/plugins/process_tree_api
+
+# Backup
+cp $DEST/server.py $DEST/server.py.bak-$(date +%Y%m%d)
+
+# Deploy
+cp wptv-fim/logic_fim.py      $DEST/logic_fim.py
+cp wptv-fim/server.py         $DEST/server.py
+cp wptv-fim/public/fim.html   $DEST/public/fim.html
+
+# Permissões
+chown wazuh-dashboard:wazuh-dashboard \
+  $DEST/logic_fim.py $DEST/server.py $DEST/public/fim.html
+chmod 755 $DEST/logic_fim.py $DEST/server.py
+chmod 644 $DEST/public/fim.html
+
+# wptv.env - adicionar a chave Anthropic (as variáveis do Indexer foram definidas no Passo 3)
+echo "WPTV_ANTHROPIC_API_KEY=<sua_chave>" >> /etc/wazuh-process-tree/wptv.env
+
+# Reiniciar
+systemctl restart wazuh-process-tree
+```
+
+### Passo 5 - Nginx (`/etc/nginx/sites-enabled/wptv`)
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name YOUR-WAZUH-SERVER-IP;   # IP ou FQDN do servidor
+
+    # Restringir o acesso HTTPS ao seu IP
+    allow YOUR-ADMIN-IP;
+    deny all;
+
+    ssl_certificate     /etc/wazuh-dashboard/certs/wazuh-dashboard.pem;
+    ssl_certificate_key /etc/wazuh-dashboard/certs/wazuh-dashboard-key.pem;
+
+    # Payloads de análise FIM/WPTV podem superar o limite padrão de 1MB
+    client_max_body_size 10m;
+
+    location / {
+        proxy_pass              https://127.0.0.1:5601;
+        proxy_ssl_verify        off;
+        proxy_set_header        Host $host;
+        proxy_set_header        X-Real-IP $remote_addr;
+        proxy_read_timeout      120s;
+    }
+
+    location /wptv/ {
+        proxy_pass              https://127.0.0.1:5000/;
+        proxy_ssl_verify        off;
+        proxy_set_header        Host $host;
+        proxy_set_header        X-Real-IP $remote_addr;
+        proxy_read_timeout      120s;
+    }
+
+    location /fim/ {
+        proxy_pass              https://127.0.0.1:5000;
+        proxy_ssl_verify        off;
+        proxy_set_header        Host $host;
+        proxy_set_header        X-Real-IP $remote_addr;
+        proxy_read_timeout      120s;
+    }
+
+    location /api/fim/ {
+        proxy_pass              https://127.0.0.1:5000;
+        proxy_ssl_verify        off;
+        proxy_set_header        Host $host;
+        proxy_set_header        X-Real-IP $remote_addr;
+        proxy_read_timeout      120s;
+    }
+}
+```
+
+> `client_max_body_size 10m` é obrigatório (achado AO-4): o payload do `POST /api/fim/analyze` ultrapassa o limite padrão de 1MB. Sem ele, o nginx devolve HTTP 413 em HTML antes de repassar ao Flask e o frontend falha com `Unexpected token '<'`.
+
+---
+
+## Validação
+
+### Confirmar que o realtime entrega eventos
+
+O alerta pode estar oculto pela regra proxy (AC-7). A fonte da verdade é o `archives.json`, que exige `logall_json: yes`. No manager:
+
+```bash
+grep -a '"syscheck"' /var/ossec/logs/archives/archives.json \
+  | jq -c '{timestamp, agent:.agent.name, rule:.rule.id, mode:.syscheck.mode, event:.syscheck.event, path:.syscheck.path}'
+```
+
+O campo `mode` indica `realtime`, `whodata` ou `scheduled`. Evento `added` com `rule: null` indica criação encoberta pelo proxy em nível 0 (achado AC-7), e não evento perdido.
+
+Para dias anteriores, o manager rotaciona o arquivo para `/var/ossec/logs/archives/YYYY/Mon/ossec-archive-DD.json.gz`; use `zcat -f <arquivo> | grep -a '"syscheck"' | jq ...`. O `grep -a` evita a mensagem `binary file matches`.
+
+### Teste de criação, modificação e exclusão
+
+```bash
+# No agente Linux
+echo "test" > /home/kr/Downloads/fim_test.txt        # 554 (exibida como 100310)
+echo "more" >> /home/kr/Downloads/fim_test.txt       # 550
+rm -f /home/kr/Downloads/fim_test.txt                # 553
+```
+
+Para acionar os limiares de correlação, repita a operação 3 vezes (ou 5 vezes para a 100304) em até 10 minutos.
+
+---
+
+## Evidências de Validação
+
+Todas as imagens são capturas reais do Wazuh Discover e do painel FIM Alert Investigation. O Handbook traz o conjunto completo, com legenda.
+
+### Regra 100310 - proxy da 554 (nível 5)
+
+Validada em LABDESK (02:14:29 e 02:13:56 de 10/10/2026) e em labnix (02:30:14 e 02:31:41 com a descrição antiga, 02:35:52 com a nova).
+
+![Regra 100310 - LABDESK](docs/ev_regra_100310_labdesk.png)
+
+![Regra 100310 - labnix, descrição atualizada](docs/ev_regra_100310_labnix_descricao.png)
+
+### Criação de arquivos - 554 e 100300 (labnix)
+
+16 hits da 554 (`p100301v3.txt` criado em 09/10/2026 às 20:51:17, modo realtime) e 22 hits da 100300 em 24 horas.
+
+![Regra 554 - labnix, 16 hits](docs/ev_regra_554_labnix_16_hits.png)
+
+![Regra 100300 - labnix](docs/ev_regra_100300_labnix.png)
+
+### Mesmo hash em diretórios distintos - 100301 (pentlab)
+
+![Regra 100301 - pentlab](docs/ev_regra_100301_pentlab.png)
+
+### Modificação de arquivos - 550 e 100302 (labnix)
+
+25 hits da 550 (`elif.zip` e `file.zip` modificados em 09/10/2026 às 23:51) e a 100302 sobre `beacon_test.sh`.
+
+![Regra 550 - labnix, 25 hits](docs/ev_regra_550_labnix_25_hits.png)
+
+![Regra 100302 - labnix](docs/ev_regra_100302_labnix.png)
+
+### Exclusão de arquivos - 553 e 100303 (labnix)
+
+34 hits da 553 entre 23:08 e 23:15 de 09/10/2026, com a 100303 às 23:08:33 e 23:15:16.
+
+![Regra 553 - labnix, 34 hits](docs/ev_regra_553_labnix_34_hits.png)
+
+![Regra 100303 - labnix](docs/ev_regra_100303_labnix.png)
+
+### Escalação - 100304 (LABDESK)
+
+![Regra 100304 - LABDESK](docs/ev_regra_100304_labdesk.png)
+
+### FIM Alert Investigation - simulação pós-exploração no Windows
+
+O script `up.ps1` executou três fases no LABDESK: staging, reconhecimento (11 comandos) e cópia lateral. Resultado: 44 alertas FIM, regra 100302 disparada, correlação FIM + árvore de processos (EventID 4688) confirmada.
+
+![Contexto de 14 eventos no janelamento de ±60 s](docs/ev_fim_investigation_context_14_eventos.png)
+
+![Alerta focal 100302](docs/ev_fim_investigation_focal_alert_100302.png)
+
+![Veredito do LLM - risk_score 87, CRITICAL, 11 técnicas MITRE](docs/ev_fim_investigation_veredito_risk_87.png)
+
+![IOCs e ações recomendadas](docs/ev_fim_investigation_iocs_recomendacoes.png)
+
+### Saída validada em Linux (labnix, 06/10/2026)
+
+```
+Alerta focal: PROC_CONTEXT.txt adicionado em /home/kr/Downloads/
+Contexto ±60 s: 8 eventos de processo com key: lpe_quartet_root_netlink_route
+
+Veredito LLM:
+  risk_score: 50 | risk_level: MEDIUM
+  T1068 Exploitation for Privilege Escalation - 52% de confiança
+  IOC: /usr/bin/vmtoolsd disparando audit key de LPE
+  Ação: auditar integridade do vmtoolsd e correlacionar a audit key
+        na linha do tempo completa do SIEM
+```
+
+---
+
+## Mapeamento MITRE ATT&CK
+
+| Técnica | ID | Regras |
+|---|---|---|
+| Data Manipulation | T1565 | 100300, 100302, 100304 |
+| Stored Data Manipulation | T1565.001 | 100300, 100302 |
+| Data Staged | T1074 | 100300 |
+| Ingress Tool Transfer | T1105 | 100301 |
+| Lateral Tool Transfer | T1570 | 100301 |
+| Data Destruction | T1485 | 100303, 100304 |
+| Indicator Removal | T1070 | 100303 |
+| Disk Wipe | T1561 | 100303 |
+| Data Encrypted for Impact | T1486 | 100304 |
+
+O capítulo 9 do Handbook cobre também o mapeamento de compliance (PCI DSS 4.0, NIST 800-53 Rev 5, HIPAA, GDPR e SOC 2).
+
+---
+
+## Conteúdo do Handbook
+
+| Capítulo | Conteúdo |
+|---|---|
+| 1. Sumário Executivo | Resultados, estrutura e ambiente de referência |
+| 2. Fundamentos do FIM | Arquitetura, os três modos, parâmetros, caminhos de rede e sincronização delta |
+| 3. FIM em Windows | SACL, `auditpol`, GPO, `windows_audit_interval`, rename e Registro |
+| 4. FIM em Linux | auditd, regras persistentes, CDB de audit-keys, provider eBPF, inotify e troubleshooting |
+| 5. Regras de Detecção de Anomalia | Seis regras, o padrão proxy da 100310 e evidências por plataforma |
+| 6. FIM Alert Investigation | Arquitetura, threat intelligence, veredito do LLM e validações |
+| 7. Regras Complementares | Ciclo de vida do agente (504, 505, 506), overflow inotify (560) e Registro |
+| 8. Perspectiva do Adversário | Evasão, timestomping e padrão de ransomware |
+| 9. Compliance e MITRE ATT&CK | PCI DSS, NIST, HIPAA, GDPR, TSC e técnicas |
+| 10. Achados Técnicos | 15 achados validados e 1 hipótese refutada |
+| 11. Configurações de Referência | Novidades da 4.14.8, `ossec.conf` endurecido, estado do servidor |
+
+---
+
+## Limites da Validação
+
+- O teste formal por threshold controlado das regras 100300 a 100304, com cenários documentados em LABDESK e labnix, é uma etapa em aberto (ver [ROADMAP.md](ROADMAP.md)). As evidências atuais vêm de scripts de simulação e de alertas reais indexados.
+- A regra 100301 não foi confirmada em Windows.
+- Os parâmetros de correlação são de laboratório e exigem baseline em produção.
+- O `syscheck frequency` de 60 s é um valor de laboratório para acelerar a validação.
+
+---
+
+## Referências
+
+- [Documentação Wazuh FIM](https://documentation.wazuh.com/current/user-manual/capabilities/file-integrity/index.html)
+- [Regras FIM customizadas](https://documentation.wazuh.com/current/user-manual/capabilities/file-integrity/creating-custom-fim-rules.html)
+- [Configuração syscheck](https://documentation.wazuh.com/current/user-manual/reference/ossec-conf/syscheck.html)
+- [Release notes 4.14.8](https://documentation.wazuh.com/current/release-notes/release-4-14-8.html)
+- [MITRE ATT&CK - T1565 Data Manipulation](https://attack.mitre.org/techniques/T1565/)
+- [MITRE ATT&CK - T1485 Data Destruction](https://attack.mitre.org/techniques/T1485/)
+- [MITRE ATT&CK - T1486 Data Encrypted for Impact](https://attack.mitre.org/techniques/T1486/)
+- [MITRE ATT&CK - T1105 Ingress Tool Transfer](https://attack.mitre.org/techniques/T1105/)
+- [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer)
+- [DIRTY-FRAG Detection with Wazuh 4.14.4](https://github.com/mym0us3r/DIRTY-FRAG-Detection-with-Wazuh-4.14.4)
+- [COPY-FAIL Detection with Wazuh 4.14.4](https://github.com/mym0us3r/COPY-FAIL-Detection-with-Wazuh-4.14.4)
+
+---
+
+## Autor
+
+**Kislley Rodrigues (m0us3r)**
+Wazuh Ambassador | Detection Engineering | Blue Team
+
+---
+
+## Agradecimentos
+
+- **Equipe Wazuh** pela plataforma SIEM/XDR open source e pelo Programa Ambassador
+
+---
+
+*Regras de detecção, decoders, painel FIM Alert Investigation e configurações de agente validados no Wazuh 4.14.8, Windows 11 Pro build 26200, Ubuntu 24.04.5 kernel 6.17.0 e Claude Sonnet 4.6.*
+
+---
+
+## Atualização 2026-10-11
+
+| Mudança | Detalhe |
+|---|---|
+| Hipótese AP-1 refutada | O suposto stall do leitor inotify do `syscheckd` no labnix não se confirmou: o realtime entrega eventos (41 eventos na janela, 36 em modo realtime). Não é issue do upstream. |
+| Handbook revisado | 53 páginas, 15 achados validados e 1 hipótese refutada, com 9 novos prints do Wazuh Discover e legenda em cada figura. |
+| Acesso ao Indexer documentado | O WPTV e o FIM Alert Investigation consultam o Wazuh Indexer com o usuário de serviço somente leitura `wptv_svc` (role `wptv_role`, índices `wazuh-alerts-*` e `wazuh-archives-*`). Credenciais em `/etc/wazuh-process-tree/wptv.env`. |
+| Regra de verificação | Confirme o realtime por `syscheck.mode` no `archives.json`, use `strace -y` incluindo `pselect6` e não consulte o `fim.db` ativo. |
+
+---
+
+## Wazuh
+
+Este projeto foi desenvolvido como parte do [Programa Wazuh Ambassador](https://wazuh.com/ambassadors-program/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
+
+O Wazuh é uma plataforma de segurança gratuita e open source que oferece proteção unificada de XDR e SIEM.
+Saiba mais em [wazuh.com](https://wazuh.com/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
