@@ -220,8 +220,7 @@ wazuh-fim-adh/
 │   └── ev_*.png                      # Evidências do Wazuh Discover e do painel
 │
 ├── README.md                         # English
-├── README.pt-BR.md                   # Português (BR)
-└── ROADMAP.md
+└── README.pt-BR.md                   # Português (BR)
 ```
 
 ---
@@ -573,7 +572,7 @@ O capítulo 9 do Handbook cobre também o mapeamento de compliance (PCI DSS 4.0,
 
 ## Limites da Validação
 
-- O teste formal por threshold controlado das regras 100300 a 100304, com cenários documentados em LABDESK e labnix, é uma etapa em aberto (ver [ROADMAP.md](ROADMAP.md)). As evidências atuais vêm de scripts de simulação e de alertas reais indexados.
+- O teste formal por threshold controlado das regras 100300 a 100304, com cenários documentados em LABDESK e labnix, é uma etapa em aberto. As evidências atuais vêm de scripts de simulação e de alertas reais indexados.
 - A regra 100301 não foi confirmada em Windows.
 - Os parâmetros de correlação são de laboratório e exigem baseline em produção.
 - O `syscheck frequency` de 60 s é um valor de laboratório para acelerar a validação.
