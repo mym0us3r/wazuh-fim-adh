@@ -243,10 +243,7 @@ wazuh-fim-adh/
 │           └── wptv.plugin.js.gz
 │
 ├── docs/
-│   ├── wazuh-fim-advanced-defenders-handbook-pt-br.docx   # Full Handbook (60 pages)
-│   ├── ev_*.png                      # Wazuh Discover and panel evidence
-│   └── ev_sysmon_*.png               # Sysmon x FIM evidence (12 captures)
-│
+│   ├── wazuh-fim-advanced-defenders-handbook-pt-br.docx   # Full Handbook 
 ├── README.md                         # English
 ├── README.pt-BR.md                   # Português (BR)
 ├── SECURITY.md                       # Security policy and vulnerability reporting
