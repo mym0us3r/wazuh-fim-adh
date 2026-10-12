@@ -1987,7 +1987,7 @@ async function submitComment() {
 }
 
 
-// ═══ MORE node: paginar filhos, toggle expand/collapse ════════════════════
+// ═══ MORE node: paginate children, toggle expand/collapse ════════════════════
 const MORE_THRESHOLD = 10;
 const moreStore = {};
 
@@ -2434,7 +2434,7 @@ async function generateFullReport() {
 }
 
 function collectFullTree(rootId) {
-        // Mapa de filhos completo: visible edges + edges de nós hidden no moreStore
+        // Full children map: visible edges + edges of hidden nodes in moreStore
         const fullChildMap = {};
         edgesDataset.forEach(e => {
             if (!fullChildMap[e.from]) fullChildMap[e.from] = [];
@@ -2447,7 +2447,7 @@ function collectFullTree(rootId) {
             });
         });
 
-        // Lookup de nós completo: visíveis + ocultos no moreStore
+        // Full node lookup: visible + hidden nodes in moreStore
         const fullNodeMap = {};
         nodesDataset.forEach(n => { fullNodeMap[n.id] = n; });
         Object.values(moreStore).forEach(store => {
@@ -3020,7 +3020,7 @@ async function loadTree() {
         nodesDataset = new vis.DataSet(nodesForDataset.concat(Object.values(networkNodes)));
         edgesDataset = new vis.DataSet(tagCrossLinkEdges(data.edges || []).concat(networkEdges));
         recolorRootsAndBranches();
-        // Aplicar estilo tree-view (card) e applyChildrenPagination após render
+        // Apply tree-view (card) style and applyChildrenPagination after render
         const _treeUpd = [];
         nodesDataset.forEach((n) => {
             if (!n.meta || n.meta.isNetworkNode || n.meta.isMoreNode) return;
