@@ -1,0 +1,71 @@
+<!--
+  FIM + Sysmon companion rules - Wazuh 4.14.x, Windows Sysmon (eventchannel).
+  Rule IDs 100500 - 100599 (custom range reserved by Wazuh: 100000 - 120000).
+  Author: Kislley Rodrigues.
+
+  Regex convention: Windows paths are stored with doubled backslashes, so one
+  separator is written as four characters (\\\\) in PCRE2 patterns, the same
+  convention used by the stock rule 0830-sysmon_id_11.xml.
+
+  Watched directory: rules 100540, 100541 and 100555 match the lab path
+  D:\File_Server_Test_Folder (pattern ^[c-z]:\\\\File_Server_Test_Folder\\\\).
+  Replace this pattern in the three rules to match the directory monitored
+  by syscheck in your environment.
+-->
+<group name="fim_sysmon,sysmon,windows,">
+  <!-- EID 2: file creation time changed (timestomping). Parent: 61604. FIM has no creation-time attribute. -->
+  <rule id="100521" level="10">
+    <if_sid>61604</if_sid>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\\\(powershell|pwsh|cmd|wscript|cscript|mshta|rundll32|regsvr32)\.exe$</field>
+    <description>Sysmon [EID 2]: file creation time changed by interpreter $(win.eventdata.image) - $(win.eventdata.targetFilename)</description>
+    <mitre>
+      <id>T1070.006</id>
+    </mitre>
+    <group>fim_sysmon_eid2,</group>
+    <options>no_full_log</options>
+  </rule>
+  <!-- EID 11: file create in a watched path (stock 92200-92211 cover Temp, Users and Public only).
+       Parents: 61613 plus the stock 0830 rules that match in any path (61613, 92202, 92203, 92211, 92212, 92215, 92223, 92227), so a stock match does not shadow these rules. -->
+  <rule id="100540" level="12">
+    <if_sid>61613,92202,92203,92211,92212,92215,92223,92227</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)^[c-z]:\\\\File_Server_Test_Folder\\\\</field>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\.(exe|dll|sys|scr|com|bat|cmd|ps1|psm1|vbs|vbe|js|jse|wsf|hta|msi|lnk)$</field>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\\\(powershell|pwsh|cmd|wscript|cscript|mshta|rundll32|regsvr32)\.exe$</field>
+    <description>Sysmon [EID 11]: executable or script created in a watched path by interpreter $(win.eventdata.image) - $(win.eventdata.targetFilename)</description>
+    <mitre>
+      <id>T1105</id>
+      <id>T1059</id>
+    </mitre>
+    <group>fim_sysmon_eid11,fim_sysmon_watch,</group>
+    <options>no_full_log</options>
+  </rule>
+  <rule id="100541" level="6">
+    <if_sid>61613,92202,92203,92211,92212,92215,92223,92227</if_sid>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)^[c-z]:\\\\File_Server_Test_Folder\\\\</field>
+    <description>Sysmon [EID 11]: file created or overwritten in a watched path by $(win.eventdata.image) - $(win.eventdata.targetFilename)</description>
+    <group>fim_sysmon_eid11,fim_sysmon_watch,</group>
+    <options>no_full_log</options>
+  </rule>
+  <!-- EID 26: file delete (logged, not archived). Parent: <if_group>sysmon_event_26</if_group>. -->
+  <rule id="100554" level="12">
+    <if_group>sysmon_event_26</if_group>
+    <field name="win.eventdata.image" type="pcre2">(?i)\\\\(powershell|pwsh|cmd|wscript|cscript|mshta|rundll32|regsvr32)\.exe$</field>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)\.(exe|dll|sys|scr|com|bat|cmd|ps1|psm1|vbs|vbe|js|jse|wsf|hta|msi|lnk)$</field>
+    <description>Sysmon [EID 26]: executable or script deleted by interpreter $(win.eventdata.image) - $(win.eventdata.targetFilename)</description>
+    <mitre>
+      <id>T1070.004</id>
+    </mitre>
+    <group>fim_sysmon_delete,</group>
+    <options>no_full_log</options>
+  </rule>
+  <rule id="100555" level="6">
+    <if_group>sysmon_event_26</if_group>
+    <field name="win.eventdata.targetFilename" type="pcre2">(?i)^[c-z]:\\\\File_Server_Test_Folder\\\\</field>
+    <description>Sysmon [EID 26]: file deleted in a watched path by $(win.eventdata.image) - $(win.eventdata.targetFilename)</description>
+    <mitre>
+      <id>T1070.004</id>
+    </mitre>
+    <group>fim_sysmon_delete,fim_sysmon_watch,</group>
+    <options>no_full_log</options>
+  </rule>
+</group>
