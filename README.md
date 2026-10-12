@@ -243,7 +243,8 @@ wazuh-fim-adh/
 │           └── wptv.plugin.js.gz
 │
 ├── docs/
-│   ├── wazuh-fim-advanced-defenders-handbook-pt-br.docx   # Full Handbook 
+│   └── wazuh-fim-advanced-defenders-handbook-pt-br.docx   # Full Handbook
+│
 ├── README.md                         # English
 ├── README.pt-BR.md                   # Português (BR)
 ├── SECURITY.md                       # Security policy and vulnerability reporting
