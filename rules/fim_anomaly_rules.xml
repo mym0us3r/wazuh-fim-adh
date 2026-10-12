@@ -1,0 +1,225 @@
+<!-- ================================================================
+     FIM Anomaly Detection Rules
+     Kislley Rodrigues (m0us3r) - Wazuh Ambassador Program
+     Reference Version: Wazuh Server 4.14.8 (serie 4.14.x)
+     File: /var/ossec/etc/rules/fim_anomaly_rules.xml
+
+     Base rules referenced (0015-ossec_rules.xml):
+       550 (level 7) - syscheck_integrity_changed - group: syscheck_file
+       553 (level 7) - syscheck_deleted           - group: syscheck_file
+       554 (level 5) - syscheck_new_entry         - group: syscheck_file
+
+     Detection scenarios (FIM-only, no Sysmon dependency):
+       Scenario 1 - Suspicious file creation    (100300, 100301)
+         Helper    - Counter isolation proxy    (100310, level 5)
+       Scenario 2 - Suspicious file modification (100302)
+       Scenario 3 - Suspicious file deletion     (100303)
+       Escalation  - Combined mixed activity     (100304)
+
+     LAB FINDINGS (Wazuh Server 4.14.8 - validated Oct 9-10, 2026)
+     ================================================================
+     [1] same_field in correlated rules maps to the decoded field name
+         as exposed by the analysisd decoder. For FIM events, the
+         correct field is "md5_after" (not "md5"). Confirmed by
+         comparing alert JSON in the Wazuh Indexer against decoder output.
+
+     [2] if_matched_sid with multiple comma-separated values is NOT
+         reliably supported in correlated rules in Wazuh 4.14.8.
+         Use if_matched_group on a shared group instead (see rule 100304).
+
+     [3] Rule 100301 counter interference - RESOLVED (Oct 9, 2026):
+         When 100300 and 100301 both use if_matched_sid 554, the
+         analysisd counter for sid 554 is shared, causing 100300 to
+         interfere with 100301 accumulation at event #3. Fix: helper
+         rule 100310 (level 5) proxies every 554 event into groups
+         fim_creation and fim_new_entry (see [6]). Rule 100301 now
+         correlates on fim_new_entry, maintaining an independent counter
+         isolated from 100300.
+
+     [4] wazuh-logtest does NOT process syscheck events through Phase 2/3.
+         The syscheck decoders are internal to the analysisd pipeline.
+         FIM rules can only be validated through the real agent pipeline.
+
+     [5] Counter interference confirmed on Linux (labnix, Oct 9, 2026):
+         LAB FINDING [3] originally noted Windows (LABDESK) as pending.
+         Testing on labnix confirmed the same interference occurs on Linux
+         when 100300 and 100301 share if_matched_sid 554. The helper rule
+         approach (100310 + if_matched_group fim_new_entry) is the fix
+         applied to both platforms.
+
+     [6] Rule 100300 child-rule interference - RESOLVED (Oct 9, 2026):
+         Rule 100310 (if_sid 554, level 5) is a child rule that fires
+         for every 554 event. Its presence as a child of 554 interferes
+         with 100300's if_matched_sid 554 correlated counter - the child
+         rule event is processed between 554 events, disrupting counter
+         accumulation. Evidence: rule 100303 (if_matched_sid 553, no
+         child rule) fires correctly; rule 100300 (if_matched_sid 554,
+         child rule 100310 exists) does not. Fix: 100310 now emits to
+         both fim_new_entry (for 100301) and fim_creation (for 100300).
+         Rule 100300 changed from if_matched_sid 554 to
+         if_matched_group fim_creation, giving it an independent counter
+         isolated from the fim_new_entry counter used by 100301.
+
+     [7] Rule 100310 level and 554 suppression - VALIDATED (Oct 10, 2026):
+         When rule 100310 (if_sid 554) runs at level 5, analysisd
+         suppresses the parent alert (rule 554). Only 100310 reaches
+         wazuh-alerts-* and the OpenSearch index. Rule 554 appears
+         only in wazuh-archives-* without a rule field.
+         This is expected Wazuh behavior: child rule at level > 0
+         consumes the parent event. Rule 100310 at level 5 is INTENTIONAL
+         - it carries all syscheck.* fields identical to 554 and is
+         the visible file-creation event in the pipeline.
+         The FIM Alert Investigation panel (logic_fim.py) includes
+         rule 100310 in FIM_FILE_RULES to handle this correctly.
+         Reference: 100310 description explicitly states [base: rule 554].
+
+     THRESHOLD NOTICE
+     frequency="3" and timeframe="600" (10 minutes) are calibrated
+     for lab testing only. In production, tune against a baseline of
+     normal activity per agent group before deploying. The ignore="30"
+     cooldown is also a lab value; set ignore="0" in production for
+     full coverage.
+
+     Deploy:
+       chown wazuh:wazuh fim_anomaly_rules.xml
+       chmod 660 fim_anomaly_rules.xml
+       cp fim_anomaly_rules.xml /var/ossec/etc/rules/
+       /var/ossec/bin/wazuh-analysisd -t 2>&1 | grep -i error
+       systemctl restart wazuh-manager
+     ================================================================ -->
+
+<group name="syscheck,fim_anomaly,">
+
+  <!-- ==============================================================
+       SCENARIO 1 - Suspicious File Creation Activity
+       Base SID: 554 | decoded_as: syscheck_new_entry
+       Helper: rule 100310 (level 5) proxies every 554 event into
+               groups fim_creation (for 100300) and fim_new_entry
+               (for 100301), giving each rule an independent counter.
+       See LAB FINDINGS [3], [5], [6], [7].
+       ============================================================== -->
+
+  <!-- HELPER | Dual counter isolation proxy - rules 100300 and 100301
+       Level 5: generates a visible alert in wazuh-alerts-* carrying
+       all syscheck.* fields from the parent 554 event. When this child
+       rule fires, analysisd suppresses the parent 554 alert (LAB
+       FINDING [7]). Rule 100310 IS the file-creation event in the
+       pipeline. The FIM Alert Investigation panel (logic_fim.py)
+       includes 100310 in FIM_FILE_RULES to handle this correctly.
+       Counter isolation: every 554 event is forwarded into groups
+       fim_creation (for 100300) and fim_new_entry (for 100301).
+       Both counters are fully independent. Emitting to a single group
+       per correlated rule prevents the child-rule interference
+       described in LAB FINDING [6].                                  -->
+  <rule id="100310" level="5">
+    <if_sid>554</if_sid>
+    <description>FIM: New file detected (syscheck_new_entry) [base: rule 554]. Event forwarded to fim_creation and fim_new_entry groups for independent counter isolation of rules 100300 and 100301.</description>
+    <group>fim_creation,fim_new_entry,</group>
+  </rule>
+
+  <!-- 1A | Mass file creation on the same agent
+       3+ file creation events within 10 minutes on the same agent.
+       Correlates on fim_creation (via helper rule 100310) to avoid
+       child-rule counter interference with if_matched_sid 554.
+       See LAB FINDING [6].
+       For multi-path setups, scope per directory using:
+         <field name="file" type="pcre2">(?i)/target/path</field>
+       Lab validation: confirmed on LABDESK (Windows) and labnix (Linux).
+       MITRE: T1565.001, T1074                                         -->
+  <rule id="100300" level="10" frequency="3" timeframe="600" ignore="30">
+    <if_matched_group>fim_creation</if_matched_group>
+    <description>FIM: 3 or more files created within 10 minutes. Possible malware staging or automated write activity. Lab threshold - tune for production.</description>
+    <group>suspicious_creation,</group>
+    <mitre>
+      <id>T1565</id>
+      <id>T1565.001</id>
+      <id>T1074</id>
+    </mitre>
+  </rule>
+
+  <!-- 1B | Same file propagated across different directories
+       Same MD5 hash (field: md5_after) detected in 3+ different
+       paths within 10 minutes. Indicates dropper replication or
+       lateral binary staging across the filesystem.
+       Requires whodata or realtime for reliable hash population.
+       Correlates on fim_new_entry (via helper rule 100310) to keep
+       its counter independent from 100300's fim_creation counter.
+       See LAB FINDINGS [3], [5], [6].
+       Lab validation: confirmed on pentlab (Linux). Not confirmed on Windows
+       (same_field over syscheck fields).
+       MITRE: T1105, T1570                                             -->
+  <rule id="100301" level="12" frequency="3" timeframe="600" ignore="30">
+    <if_matched_group>fim_new_entry</if_matched_group>
+    <same_field>md5_after</same_field>
+    <different_field>file</different_field>
+    <description>FIM: Same file hash created in 3 or more different directories within 10 minutes. Possible malware propagation or dropper replication. Lab threshold - tune for production.</description>
+    <group>suspicious_creation,</group>
+    <mitre>
+      <id>T1105</id>
+      <id>T1570</id>
+    </mitre>
+  </rule>
+
+  <!-- ==============================================================
+       SCENARIO 2 - Suspicious File Modification Activity
+       Base SID: 550 | decoded_as: syscheck_integrity_changed
+       ============================================================== -->
+
+  <!-- 2A | Mass file modification on the same agent
+       3+ checksum-changed events within 10 minutes. Covers both
+       same-directory and cross-directory patterns. Possible indicators:
+       payload execution, in-place encryption, or config tampering.
+       Lab validation: confirmed on LABDESK (Windows) and labnix (Linux).
+       MITRE: T1565.001                                                -->
+  <rule id="100302" level="10" frequency="3" timeframe="600" ignore="30">
+    <if_matched_sid>550</if_matched_sid>
+    <description>FIM: 3 or more files modified within 10 minutes. Possible payload execution, in-place encryption, or automated tampering. Lab threshold - tune for production.</description>
+    <group>suspicious_modification,</group>
+    <mitre>
+      <id>T1565</id>
+      <id>T1565.001</id>
+    </mitre>
+  </rule>
+
+  <!-- ==============================================================
+       SCENARIO 3 - Suspicious File Deletion Activity
+       Base SID: 553 | decoded_as: syscheck_deleted
+       ============================================================== -->
+
+  <!-- 3A | Mass file deletion on the same agent
+       3+ file deletion events within 10 minutes. Indicators:
+       evidence destruction, anti-forensics cleanup, log wiping,
+       or malware removing artifacts post-execution.
+       Lab validation: confirmed on LABDESK (Windows) and labnix (Linux).
+       MITRE: T1485, T1070, T1561                                      -->
+  <rule id="100303" level="10" frequency="3" timeframe="600" ignore="30">
+    <if_matched_sid>553</if_matched_sid>
+    <description>FIM: 3 or more files deleted within 10 minutes. Possible evidence destruction, anti-forensics, or post-execution malware cleanup. Lab threshold - tune for production.</description>
+    <group>suspicious_deletion,</group>
+    <mitre>
+      <id>T1485</id>
+      <id>T1070</id>
+      <id>T1561</id>
+    </mitre>
+  </rule>
+
+  <!-- ==============================================================
+       ESCALATION - Combined Mixed File Activity (level 14)
+       Correlation via group: syscheck_file
+       NOTE: if_matched_sid with multiple comma-separated values is
+       NOT reliably supported in Wazuh 4.14.8 for correlated rules.
+       if_matched_group on syscheck_file is the validated approach.
+       Lab validation: confirmed on LABDESK (Windows) and labnix (Linux).
+       ============================================================== -->
+  <rule id="100304" level="14" frequency="5" timeframe="600" ignore="30">
+    <if_matched_group>syscheck_file</if_matched_group>
+    <description>FIM: High volume mixed file activity - 5 or more create, modify, and delete events within 10 minutes. Combined pattern suggesting active malware execution. Lab threshold - tune for production.</description>
+    <group>suspicious_combined,fim_escalation,</group>
+    <mitre>
+      <id>T1485</id>
+      <id>T1486</id>
+      <id>T1565</id>
+    </mitre>
+  </rule>
+
+</group>
