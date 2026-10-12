@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>FIM Alert Investigation - Wazuh FIM Advanced Handbook</title>
+<link rel="icon" type="image/x-icon" href="favicon.ico">
+<style>
+/* ── Base (same palette as WPTV) ────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', sans-serif;
+  margin: 0;
+  background: #f7f8fa;
+  color: #2c2c2a;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Navbar ──────────────────────────────────────────────────────────────── */
+.navbar {
+  background: #111827;
+  color: #00a0d1;
+  padding: 12px 24px;
+  border-bottom: 2px solid #00a0d1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+.navbar h1 { margin: 0; font-size: 15px; font-weight: 700; letter-spacing: 0.5px; }
+.navbar .badge {
+  background: #185fa5;
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 600;
+}
+.navbar-links { margin-left: auto; display: flex; gap: 16px; }
+.navbar-links a {
+  color: #9ca3af;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  transition: color 0.15s;
+}
+.navbar-links a:hover { color: #00a0d1; }
+
+/* ── Toolbar ─────────────────────────────────────────────────────────────── */
+.toolbar {
+  background: #f1f3f5;
+  padding: 10px 24px;
+  display: flex;
+  gap: 12px;
+  border-bottom: 1px solid #d3d1c7;
+  align-items: center;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.toolbar label { font-size: 12px; font-weight: 600; color: #5f5e5a; }
+.toolbar input, .toolbar select {
+  background: #fff;
+  border: 1px solid #b4b2a9;
+  color: #2c2c2a;
+  padding: 7px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+}
+.toolbar input[type="text"] { width: 140px; }
+.toolbar input[type="number"] { width: 70px; }
+.btn {
+  background: #185fa5;
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 13px;
+  transition: background 0.15s;
+}
+.btn:hover { background: #0f4a82; }
+.btn:disabled { background: #b4b2a9; cursor: not-allowed; }
+.btn-outline {
+  background: #111827;
+  color: #00a0d1;
+  border: 1.5px solid #00a0d1;
+}
+.btn-outline:hover { background: #1e293b; }
+.btn-ai {
+  background: #111827;
+  color: #00a0d1;
+  border: 1.5px solid #00a0d1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn-ai:hover { background: #1e293b; }
+.btn-ai:disabled { background: #4b5563; border-color: #4b5563; color: #9ca3af; }
+.spinner {
+  width: 12px; height: 12px;
+  border: 2px solid #9ca3af;
+  border-top-color: #00a0d1;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  display: none;
+}
+.btn-ai.loading .spinner { display: block; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.stats-bar {
+  background: #fff;
+  padding: 4px 24px;
+  font-size: 11px;
+  color: #5f5e5a;
+  font-weight: 600;
+  border-bottom: 1px solid #e5e7eb;
+  flex-shrink: 0;
+}
+.stats-bar span { color: #185fa5; }
+
+/* ── Main layout: list + detail ──────────────────────────────────────────── */
+.main {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Resizer */
+.resizer {
+  width: 5px;
+  background: #374151;
+  cursor: col-resize;
+  flex-shrink: 0;
+  transition: background 0.15s;
+  position: relative;
+  z-index: 10;
+}
+.resizer:hover, .resizer.dragging { background: #00a0d1; }
+
+/* Alert list */
+.list-panel {
+  width: 420px;
+  min-width: 200px;
+  max-width: 70%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: none;
+  background: #fff;
+  overflow: hidden;
+}
+.list-panel .list-header {
+  background: #111827;
+  color: #9ca3af;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 6px 14px;
+  display: flex;
+  gap: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.list-panel .list-header span:first-child { width: 80px; }
+.list-panel .list-header span:nth-child(2) { width: 50px; }
+.list-panel .list-header span:nth-child(3) { flex: 1; }
+#alertList {
+  flex: 1;
+  overflow-y: auto;
+}
+.alert-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px 14px;
+  border-bottom: 1px solid #f0f0ee;
+  cursor: pointer;
+  transition: background 0.1s;
+  font-size: 12px;
+}
+.alert-row:hover { background: #f0f6ff; }
+.alert-row.selected { background: #dbeafe; border-left: 3px solid #185fa5; }
+.alert-row .ts {
+  width: 80px;
+  flex-shrink: 0;
+  color: #6b7280;
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+}
+.alert-row .lvl-badge {
+  width: 26px;
+  flex-shrink: 0;
+  text-align: center;
+  font-weight: 700;
+  font-size: 11px;
+  border-radius: 3px;
+  padding: 1px 0;
+}
+.lvl-5  { background: #fef3c7; color: #92400e; }
+.lvl-7  { background: #fed7aa; color: #7c2d12; }
+.lvl-12 { background: #fecaca; color: #7f1d1d; }
+.lvl-15 { background: #7f1d1d; color: #fef2f2; }
+.lvl-high { background: #dc2626; color: #fff; }
+.alert-row .info { flex: 1; min-width: 0; }
+.alert-row .rid {
+  font-weight: 700;
+  color: #185fa5;
+  font-family: 'Courier New', monospace;
+}
+.alert-row .desc {
+  color: #374151;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.alert-row .path {
+  color: #6b7280;
+  font-family: 'Courier New', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 10px;
+}
+.group-tag {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+.tag-file     { background: #e0f2fe; color: #0369a1; }
+.tag-registry { background: #fef9c3; color: #713f12; }
+.tag-anomaly  { background: #fce7f3; color: #9d174d; }
+
+/* Detail panel */
+.detail-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: #111827;
+  color: #e2e8f0;
+  overflow: hidden;
+}
+.detail-tabs {
+  display: flex;
+  border-bottom: 1px solid #374151;
+  flex-shrink: 0;
+}
+.tab-btn {
+  background: none;
+  border: none;
+  color: #9ca3af;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 10px 18px;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  transition: color 0.15s, border-color 0.15s;
+}
+.tab-btn.active { color: #00a0d1; border-bottom-color: #00a0d1; }
+.tab-btn:hover:not(.active) { color: #d1d5db; }
+
+.tab-content { display: none; flex: 1; overflow-y: auto; padding: 16px; }
+.tab-content.active { display: block; }
+
+/* Context cards */
+.ctx-section {
+  margin-bottom: 16px;
+}
+.ctx-section h4 {
+  color: #00a0d1;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0 0 8px 0;
+  padding-bottom: 4px;
+  border-bottom: 1px solid #374151;
+}
+.ctx-item {
+  background: #1a202c;
+  border: 1px solid #374151;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-family: 'Courier New', monospace;
+}
+.ctx-item .ci-ts { color: #6b7280; font-size: 10px; }
+.ctx-item .ci-path { color: #93c5fd; word-break: break-all; }
+.ctx-item .ci-key { color: #a78bfa; word-break: break-all; }
+.ctx-item .ci-proc { color: #86efac; }
+.ctx-item .ci-rule { color: #fde68a; }
+.ctx-item .ci-user { color: #fb923c; }
+.empty-state {
+  color: #4b5563;
+  font-size: 12px;
+  font-style: italic;
+  padding: 8px 0;
+}
+
+/* AI verdict card */
+.verdict-card {
+  background: #1a202c;
+  border: 1px solid #374151;
+  border-radius: 6px;
+  padding: 16px;
+  margin-bottom: 12px;
+}
+.verdict-score {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.score-circle {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.score-LOW      { background: #14532d; color: #86efac; border: 2px solid #16a34a; }
+.score-MEDIUM   { background: #451a03; color: #fde68a; border: 2px solid #d97706; }
+.score-HIGH     { background: #7f1d1d; color: #fca5a5; border: 2px solid #dc2626; }
+.score-CRITICAL { background: #3b0764; color: #e9d5ff; border: 2px solid #9333ea; }
+.verdict-meta h3 { margin: 0 0 4px 0; color: #e2e8f0; font-size: 13px; }
+.verdict-meta .risk-level {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.rl-LOW      { background: #14532d; color: #86efac; }
+.rl-MEDIUM   { background: #451a03; color: #fde68a; }
+.rl-HIGH     { background: #7f1d1d; color: #fca5a5; }
+.rl-CRITICAL { background: #3b0764; color: #e9d5ff; }
+
+.verdict-verdict {
+  color: #d1fae5;
+  font-size: 12px;
+  font-style: italic;
+  margin-bottom: 10px;
+  padding: 6px 10px;
+  background: #0d1f0f;
+  border-radius: 4px;
+  border-left: 3px solid #16a34a;
+}
+.verdict-section { margin-bottom: 10px; }
+.verdict-section h4 {
+  color: #00a0d1;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  margin: 0 0 6px 0;
+}
+.verdict-section p, .verdict-section li {
+  font-size: 12px;
+  color: #d1d5db;
+  margin: 0 0 4px 0;
+  line-height: 1.5;
+}
+.verdict-section ul { margin: 0; padding-left: 16px; }
+.technique-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 4px;
+}
+.technique-id {
+  font-family: 'Courier New', monospace;
+  color: #fde68a;
+  font-size: 11px;
+  font-weight: 700;
+  min-width: 90px;
+}
+.technique-name { color: #d1d5db; font-size: 12px; flex: 1; }
+.confidence-bar-wrap {
+  width: 60px;
+  background: #374151;
+  border-radius: 3px;
+  height: 6px;
+}
+.confidence-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: #00a0d1;
+}
+.ioc-row {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #a5f3fc;
+  padding: 3px 0;
+  word-break: break-all;
+}
+.ioc-type {
+  color: #6b7280;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-right: 6px;
+}
+.tokens-info {
+  color: #4b5563;
+  font-size: 10px;
+  margin-top: 8px;
+  text-align: right;
+}
+
+/* Empty/placeholder state */
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #374151;
+  text-align: center;
+  padding: 40px;
+}
+.placeholder h3 { color: #4b5563; font-size: 15px; margin-bottom: 8px; }
+.placeholder p { font-size: 12px; line-height: 1.6; max-width: 320px; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: #1f2937; }
+::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #4b5563; }
+</style>
+</head>
+<body>
+
+<!-- ── Navbar ──────────────────────────────────────────────────────────── -->
+<div class="navbar">
+  <h1>FIM Alert Investigation</h1>
+  <span class="badge">Wazuh 4.14.8</span>
+  <div class="navbar-links">
+    <a href="https://documentation.wazuh.com/current/user-manual/capabilities/file-integrity/index.html" target="_blank">FIM Docs</a>
+  </div>
+</div>
+
+<!-- ── Toolbar ─────────────────────────────────────────────────────────── -->
+<div class="toolbar">
+  <div style="display:flex;align-items:center;gap:6px">
+    <label title="Numeric ID (004) or hostname (LABDESK)">Agent ID</label>
+    <input type="text" id="agentId" placeholder="004 ou LABDESK" value="" style="width:130px"
+           title="Numeric ID (e.g. 004) or hostname (e.g. LABDESK)">
+  </div>
+  <div style="display:flex;align-items:center;gap:6px">
+    <label title="Filter by path, filename, rule description or any keyword">Search</label>
+    <input type="text" id="searchStr" placeholder="ps1, up.ps1, keyword..." style="width:160px"
+           title="Filter alerts by path, filename, rule description or any keyword"
+           oninput="applySearch()">
+  </div>
+
+  <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <label>Time</label>
+    <select id="timePreset" style="width:120px" onchange="onTimePresetChange()">
+      <option value="10m">Last 10 min</option>
+      <option value="15m">Last 15 min</option>
+      <option value="30m">Last 30 min</option>
+      <option value="1h" selected>Last 1 hour</option>
+      <option value="2h">Last 2 hours</option>
+      <option value="3h">Last 3 hours</option>
+      <option value="4h">Last 4 hours</option>
+      <option value="5h">Last 5 hours</option>
+      <option value="6h">Last 6 hours</option>
+      <option value="24h">Last 24 hours</option>
+      <option value="custom">Custom</option>
+    </select>
+    <span id="customRange" style="display:none;align-items:center;gap:6px;flex-wrap:wrap">
+      <input type="datetime-local" id="startDt" style="width:168px" title="Start">
+      <span style="color:#6b7280;font-size:11px">→</span>
+      <input type="datetime-local" id="endDt" style="width:168px" title="End">
+    </span>
+  </div>
+
+  <div style="display:flex;align-items:center;gap:6px">
+    <label title="Filter by rule category">
+      Rules
+      <span style="cursor:help;color:#6b7280" title="All FIM rules: 550/553/554/517/100310 (file), 594/597/598/750/751/752 (registry), 100300-100304 (anomaly)">ⓘ</span>
+    </label>
+    <select id="ruleGroup" style="width:190px">
+      <option value="">All FIM rules</option>
+      <option value="file">File events - 550/553/554/517/100310</option>
+      <option value="registry">Registry - 594/597/598/750/751/752</option>
+      <option value="anomaly">Anomaly correlation - 100300-100304</option>
+    </select>
+  </div>
+
+  <button class="btn btn-outline" id="loadBtn" onclick="loadAlerts()">Load Alerts</button>
+  <button class="btn btn-ai" id="analyzeBtn" onclick="analyzeContext()" disabled>
+    <span class="spinner" id="aiSpinner"></span>
+    Investigate with AI
+  </button>
+</div>
+<div class="stats-bar" id="statsBar">
+  No alerts loaded. Enter an Agent ID and click Load Alerts.
+</div>
+
+<!-- ── Main ────────────────────────────────────────────────────────────── -->
+<div class="main">
+
+  <!-- Alert list -->
+  <div class="list-panel">
+    <div class="list-header">
+      <span>Timestamp</span>
+      <span>Lvl</span>
+      <span>Rule / Path</span>
+    </div>
+    <div id="alertList">
+      <div class="placeholder" style="height:100%">
+        <h3>No alerts loaded</h3>
+        <p>Enter an agent ID and click Load Alerts to start.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resizer -->
+  <div class="resizer" id="panelResizer"></div>
+
+  <!-- Detail panel -->
+  <div class="detail-panel">
+    <div class="detail-tabs">
+      <button class="tab-btn active" onclick="switchTab('tabFocal',this)">Focal Alert</button>
+      <button class="tab-btn" onclick="switchTab('tabContext',this)">Context</button>
+      <button class="tab-btn" onclick="switchTab('tabVerdict',this)">AI Verdict</button>
+    </div>
+
+    <!-- Focal alert tab -->
+    <div class="tab-content active" id="tabFocal">
+      <div class="placeholder" id="focalPlaceholder">
+        <h3>Select an alert</h3>
+        <p>Click any alert in the list to view its details and build the investigation context.</p>
+      </div>
+      <div id="focalContent" style="display:none"></div>
+    </div>
+
+    <!-- Context tab -->
+    <div class="tab-content" id="tabContext">
+      <div class="placeholder" id="ctxPlaceholder">
+        <h3>No context loaded</h3>
+        <p>Select an alert and the ±60s context will be fetched automatically.</p>
+      </div>
+      <div id="ctxContent" style="display:none"></div>
+    </div>
+
+    <!-- AI verdict tab -->
+    <div class="tab-content" id="tabVerdict">
+      <div class="placeholder" id="verdictPlaceholder">
+        <h3>FIM Alert Investigation</h3>
+        <p>Click <strong>Investigate with AI</strong> button to run.</p>
+      </div>
+      <div id="verdictContent" style="display:none"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────────────
+let allAlerts       = [];   // full list from server (sorted DESC)
+let currentAlerts   = [];   // filtered list (shown in UI)
+let selectedAlert   = null;
+let currentContext  = null;
+let lastVerdict     = null;
+let verdictLang     = 'en'; // 'en' | 'pt'
+
+// Rule ID group mapping
+const RULE_GROUPS = {
+  file:     new Set(['550','553','554','517','100310']),
+  registry: new Set(['594','597','598','750','751','752']),
+  anomaly:  new Set(['100300','100301','100302','100303','100304']),
+};
+
+function ruleGroupTag(ruleId) {
+  if (RULE_GROUPS.file.has(ruleId))     return '<span class="group-tag tag-file">file</span>';
+  if (RULE_GROUPS.registry.has(ruleId)) return '<span class="group-tag tag-registry">reg</span>';
+  if (RULE_GROUPS.anomaly.has(ruleId))  return '<span class="group-tag tag-anomaly">anom</span>';
+  return '';
+}
+
+function levelClass(lvl) {
+  const l = parseInt(lvl, 10);
+  if (l >= 15)  return 'lvl-15';
+  if (l >= 12)  return 'lvl-12';
+  if (l >= 7)   return 'lvl-7';
+  return 'lvl-5';
+}
+
+function fmtTs(iso) {
+  if (!iso) return '';
+  // Show HH:MM:SS from ISO timestamp
+  const d = new Date(iso);
+  return d.toTimeString().slice(0,8);
+}
+
+function escHtml(s) {
+  return String(s||'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── Load alerts ───────────────────────────────────────────────────────────
+function onTimePresetChange() {
+  const preset = document.getElementById('timePreset').value;
+  const customEl = document.getElementById('customRange');
+  customEl.style.display = (preset === 'custom') ? 'flex' : 'none';
+}
+
+function resolveTimeParams() {
+  const preset = document.getElementById('timePreset').value;
+
+  if (preset === 'custom') {
+    const startRaw = document.getElementById('startDt').value;
+    const endRaw   = document.getElementById('endDt').value;
+    if (!startRaw || !endRaw) throw new Error('Fill in both Start and End for Custom range');
+    const s = new Date(startRaw);
+    const e = new Date(endRaw);
+    if (e <= s)                            throw new Error('End must be after Start');
+    if ((e - s) > 90 * 86400 * 1000)      throw new Error('Maximum custom range is 90 days');
+    const label = `${startRaw.replace('T',' ')} → ${endRaw.replace('T',' ')}`;
+    return {
+      param: `&start=${encodeURIComponent(s.toISOString())}&end=${encodeURIComponent(e.toISOString())}`,
+      label,
+    };
+  }
+
+  const PRESET_MAP = {
+    '10m': {hours: 10/60,  label: 'last 10 min'},
+    '15m': {hours: 15/60,  label: 'last 15 min'},
+    '30m': {hours: 0.5,    label: 'last 30 min'},
+    '1h':  {hours: 1,      label: 'last 1 hour'},
+    '2h':  {hours: 2,      label: 'last 2 hours'},
+    '3h':  {hours: 3,      label: 'last 3 hours'},
+    '4h':  {hours: 4,      label: 'last 4 hours'},
+    '5h':  {hours: 5,      label: 'last 5 hours'},
+    '6h':  {hours: 6,      label: 'last 6 hours'},
+    '24h': {hours: 24,     label: 'last 24 hours'},
+  };
+  const p = PRESET_MAP[preset] || PRESET_MAP['1h'];
+  return {param: `&range=${p.hours}`, label: p.label};
+}
+
+// Detect if value looks like a hostname (has letters) vs pure numeric agent ID
+function isHostname(val) {
+  return /[a-zA-Z]/.test(val);
+}
+
+async function loadAlerts() {
+  const agentInput = document.getElementById('agentId').value.trim();
+  const groupSel   = document.getElementById('ruleGroup').value;
+
+  if (!agentInput) {
+    alert('Enter an Agent ID (numeric: 004) or hostname (e.g. LABDESK)');
+    return;
+  }
+
+  let timeRes;
+  try { timeRes = resolveTimeParams(); }
+  catch(e) { alert(e.message); return; }
+
+  let ruleParam = '';
+  if (groupSel && RULE_GROUPS[groupSel]) {
+    ruleParam = '&rules=' + encodeURIComponent([...RULE_GROUPS[groupSel]].join(','));
+  }
+
+  // Route to host= param when input contains letters (hostname), else agent_id=
+  const identParam = isHostname(agentInput)
+    ? `host=${encodeURIComponent(agentInput)}`
+    : `agent_id=${encodeURIComponent(agentInput)}`;
+
+  document.getElementById('statsBar').textContent = 'Loading...';
+  document.getElementById('loadBtn').disabled = true;
+
+  try {
+    const res = await fetch(
+      `/api/fim/alerts?${identParam}${timeRes.param}${ruleParam}`
+    );
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    // Sort DESC - newest event first
+    allAlerts = (data.alerts || []).slice().reverse();
+    document.getElementById('searchStr').value = '';
+    currentAlerts = allAlerts.slice();
+    renderAlertList();
+    document.getElementById('statsBar').innerHTML =
+      `Loaded <span>${allAlerts.length}</span> FIM alerts for <span>${escHtml(agentInput)}</span> - <span>${escHtml(timeRes.label)}</span>`;
+  } catch(e) {
+    document.getElementById('statsBar').textContent = 'Error: ' + e.message;
+  } finally {
+    document.getElementById('loadBtn').disabled = false;
+  }
+}
+
+// ── Free text search (client-side filter) ─────────────────────────────────
+function applySearch() {
+  const q = document.getElementById('searchStr').value.trim().toLowerCase();
+  if (!q) {
+    currentAlerts = allAlerts.slice();
+  } else {
+    currentAlerts = allAlerts.filter(a => {
+      return (
+        (a.path        || '').toLowerCase().includes(q) ||
+        (a.description || '').toLowerCase().includes(q) ||
+        (a.rule_id     || '').toLowerCase().includes(q) ||
+        (a.event       || '').toLowerCase().includes(q) ||
+        (a.agent_name  || '').toLowerCase().includes(q) ||
+        (a.agent_id    || '').toLowerCase().includes(q) ||
+        (a.groups || []).some(g => g.toLowerCase().includes(q)) ||
+        (a.mitre  || []).some(m => m.toLowerCase().includes(q))
+      );
+    });
+  }
+  renderAlertList();
+  const bar = document.getElementById('statsBar');
+  if (q) {
+    bar.innerHTML =
+      `Showing <span>${currentAlerts.length}</span> of <span>${allAlerts.length}</span> alerts matching "<span>${escHtml(q)}</span>"`;
+  } else {
+    bar.innerHTML =
+      `Loaded <span>${allAlerts.length}</span> FIM alerts`;
+  }
+}
+
+function renderAlertList() {
+  const container = document.getElementById('alertList');
+  if (!currentAlerts.length) {
+    container.innerHTML = '<div class="placeholder" style="padding:40px;text-align:center"><h3>No alerts found</h3><p>Try increasing the time range or removing rule filters.</p></div>';
+    return;
+  }
+
+  container.innerHTML = currentAlerts.map((a, idx) => {
+    const rid   = a.rule_id || '';
+    const lvl   = a.rule_level || 0;
+    const desc  = a.description || '';
+    const path  = a.path || '';
+    const event = a.event || '';
+    const ts    = fmtTs(a.timestamp);
+
+    return `<div class="alert-row" data-idx="${idx}" onclick="selectAlert(${idx})">
+      <span class="ts">${escHtml(ts)}</span>
+      <span class="lvl-badge ${levelClass(lvl)}">${lvl}</span>
+      <div class="info">
+        <div><span class="rid">${escHtml(rid)}</span> ${ruleGroupTag(rid)}</div>
+        <div class="desc">${escHtml(desc)}</div>
+        <div class="path">${event ? escHtml(event)+': ' : ''}${escHtml(path)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Select alert → load context ───────────────────────────────────────────
+async function selectAlert(idx) {
+  selectedAlert  = currentAlerts[idx];
+  currentContext = null;
+
+  document.querySelectorAll('.alert-row').forEach(r => r.classList.remove('selected'));
+  const row = document.querySelector(`.alert-row[data-idx="${idx}"]`);
+  if (row) row.classList.add('selected');
+
+  renderFocalAlert(selectedAlert);
+  switchTab('tabFocal', document.querySelector('.tab-btn'));
+
+  document.getElementById('analyzeBtn').disabled = true;
+  document.getElementById('ctxPlaceholder').style.display = 'flex';
+  document.getElementById('ctxContent').style.display = 'none';
+  document.getElementById('verdictPlaceholder').style.display = 'flex';
+  document.getElementById('verdictContent').style.display = 'none';
+
+  // Auto-fetch context
+  await fetchContext(selectedAlert);
+}
+
+function discoverUrl(a) {
+  // Build Wazuh 4.14.8 data-explorer URL filtered by agent.name + rule.id
+  const agentName = a.agent_name || '';
+  const ruleId    = a.rule_id    || '';
+
+  const filters = [];
+  if (agentName) {
+    filters.push(
+      `('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'wazuh-alerts-*',` +
+      `key:agent.name,negate:!f,params:(query:${agentName}),type:phrase),` +
+      `query:(match_phrase:(agent.name:${agentName})))`
+    );
+  }
+  if (ruleId) {
+    filters.push(
+      `('$state':(store:appState),meta:(alias:!n,disabled:!f,index:'wazuh-alerts-*',` +
+      `key:rule.id,negate:!f,params:(query:'${ruleId}'),type:phrase),` +
+      `query:(match_phrase:(rule.id:'${ruleId}')))`
+    );
+  }
+
+  const _a = `(discover:(columns:!(agent.name,rule.description,rule.id,syscheck.path,full_log),isDirty:!t,sort:!()),metadata:(indexPattern:'wazuh-alerts-*',view:discover))`;
+  const _g = `(filters:!(),refreshInterval:(pause:!t,value:0),time:(from:now-24h,to:now))`;
+  const _q = `(filters:!(${filters.join(',')}),query:(language:lucene,query:''))`;
+
+  return `/app/data-explorer/discover#?_a=${_a}&_g=${_g}&_q=${_q}`;
+}
+
+function renderFocalAlert(a) {
+  document.getElementById('focalPlaceholder').style.display = 'none';
+  document.getElementById('focalContent').style.display     = 'block';
+
+  const discoverHref = a.agent_name ? discoverUrl(a) : null;
+
+  let html = `<div class="ctx-section">
+    <h4>Alert - rule ${escHtml(a.rule_id)} (level ${escHtml(String(a.rule_level))})</h4>
+    <div class="ctx-item">
+      <div class="ci-rule">${escHtml(a.description)}</div>
+      <div class="ci-ts">${escHtml(a.timestamp)}</div>
+      ${a.path ? `<div class="ci-path">path: ${escHtml(a.path)}</div>` : ''}
+      ${a.event ? `<div>event: <strong>${escHtml(a.event)}</strong> | mode: ${escHtml(a.mode||'')}</div>` : ''}
+      ${a.agent_name ? `<div>agent: ${escHtml(a.agent_name)} (${escHtml(a.agent_id)})</div>` : ''}
+      ${a.mitre && a.mitre.length ? `<div style="color:#fde68a">MITRE: ${a.mitre.map(escHtml).join(', ')}</div>` : ''}
+      ${discoverHref ? `<div style="margin-top:8px">
+        <a href="${discoverHref}" target="_blank"
+           style="color:#00a0d1;font-size:11px;font-weight:700;text-decoration:none;
+                  border:1px solid #00a0d1;padding:4px 10px;border-radius:3px;display:inline-block">
+          &#128269; Open in Discover
+        </a>
+      </div>` : ''}
+    </div>
+  </div>`;
+
+  document.getElementById('focalContent').innerHTML = html;
+}
+
+async function fetchContext(alert) {
+  if (!alert) return;
+
+  try {
+    const params = new URLSearchParams({
+      alert_id:  alert.id || '',
+      agent_id:  alert.agent_id || '',
+      timestamp: alert.timestamp || '',
+    });
+    const res = await fetch('/api/fim/context?' + params.toString());
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    currentContext = data;
+    renderContext(data);
+    document.getElementById('analyzeBtn').disabled = false;
+  } catch(e) {
+    document.getElementById('ctxContent').innerHTML =
+      `<div style="color:#f87171;padding:16px">Context error: ${escHtml(e.message)}</div>`;
+    document.getElementById('ctxPlaceholder').style.display = 'none';
+    document.getElementById('ctxContent').style.display = 'block';
+  }
+}
+
+function renderContext(ctx) {
+  document.getElementById('ctxPlaceholder').style.display = 'none';
+  document.getElementById('ctxContent').style.display = 'block';
+
+  const w = ctx.window || {};
+  let html = `<div style="color:#6b7280;font-size:11px;margin-bottom:12px">
+    Context window: ${escHtml(w.start||'')} → ${escHtml(w.end||'')} (±60s)
+  </div>`;
+
+  // File events
+  const fe = ctx.file_events || [];
+  html += `<div class="ctx-section"><h4>File events (${fe.length})</h4>`;
+  if (!fe.length) {
+    html += '<div class="empty-state">No additional file events in window</div>';
+  } else {
+    fe.forEach(ev => {
+      const sc = ev.syscheck || {};
+      const r  = ev.rule || {};
+      html += `<div class="ctx-item">
+        <div class="ci-ts">${escHtml(ev.timestamp||'')} | rule ${escHtml(r.id||'')} (${escHtml(r.description||'')})</div>
+        <div class="ci-path">${escHtml(sc.event||'')} ${escHtml(sc.path||'')}</div>
+        ${sc.audit?.user?.name ? `<div class="ci-user">user: ${escHtml(sc.audit.user.name)}</div>` : ''}
+        ${sc.audit?.process?.name ? `<div class="ci-proc">process: ${escHtml(sc.audit.process.name)}</div>` : ''}
+      </div>`;
+    });
+  }
+  html += '</div>';
+
+  // Registry events
+  const re = ctx.registry || [];
+  html += `<div class="ctx-section"><h4>Registry events (${re.length})</h4>`;
+  if (!re.length) {
+    html += '<div class="empty-state">No registry events in window</div>';
+  } else {
+    re.forEach(ev => {
+      const sc = ev.syscheck || {};
+      const r  = ev.rule || {};
+      html += `<div class="ctx-item">
+        <div class="ci-ts">${escHtml(ev.timestamp||'')} | rule ${escHtml(r.id||'')} (${escHtml(r.description||'')})</div>
+        <div class="ci-key">${escHtml(sc.path||'')}</div>
+      </div>`;
+    });
+  }
+  html += '</div>';
+
+  // Process events
+  const pe = ctx.process_events || [];
+  html += `<div class="ctx-section"><h4>Process events - 4688 / execve (${pe.length})</h4>`;
+  if (!pe.length) {
+    html += '<div class="empty-state">No process events (enable wazuh-archives-* for this)</div>';
+  } else {
+    pe.forEach(ev => {
+      const d   = ev.data || {};
+      const win = (d.win || {}).eventdata || {};
+      const aud = d.audit || {};
+
+      // Windows EventID 4688
+      const isWin = !!win.newProcessName;
+      // Linux auditd SYSCALL
+      const isLin = !!aud.exe;
+
+      html += `<div class="ctx-item">
+        <div class="ci-ts">${escHtml(ev.timestamp||'')}</div>`;
+
+      if (isWin) {
+        html += `
+        ${win.newProcessName  ? `<div class="ci-proc">exe: ${escHtml(win.newProcessName)}</div>` : ''}
+        ${win.parentProcessName ? `<div>parent: ${escHtml(win.parentProcessName)}</div>` : ''}
+        ${win.commandLine     ? `<div style="color:#9ca3af;font-size:10px">cmd: ${escHtml(win.commandLine.slice(0,120))}</div>` : ''}
+        ${win.subjectUserName ? `<div class="ci-user">user: ${escHtml(win.subjectUserName)}</div>` : ''}`;
+      } else if (isLin) {
+        html += `
+        <div class="ci-proc">exe: ${escHtml(aud.exe||'')}</div>
+        ${aud.command ? `<div>cmd: ${escHtml(aud.command)}</div>` : ''}
+        ${aud.ppid    ? `<div style="color:#6b7280;font-size:10px">pid: ${escHtml(aud.pid||'')} ppid: ${escHtml(aud.ppid||'')}</div>` : ''}
+        ${(aud.uid && aud.uid !== '0') || aud.auid !== '4294967295'
+          ? `<div class="ci-user">uid: ${escHtml(aud.uid||'')} auid: ${escHtml(aud.auid||'')}</div>`
+          : `<div class="ci-user">uid: ${escHtml(aud.uid||'')} (root)</div>`}
+        ${aud.key     ? `<div style="color:#a78bfa;font-size:10px">key: ${escHtml(aud.key)}</div>` : ''}`;
+      }
+
+      html += `</div>`;
+    });
+  }
+  html += '</div>';
+
+  // Anomaly
+  const an = ctx.anomaly || [];
+  html += `<div class="ctx-section"><h4>Anomaly correlation (${an.length})</h4>`;
+  if (!an.length) {
+    html += '<div class="empty-state">No anomaly correlation hits in window</div>';
+  } else {
+    an.forEach(ev => {
+      const r = ev.rule || {};
+      html += `<div class="ctx-item">
+        <div class="ci-rule">rule ${escHtml(r.id||'')} lvl ${escHtml(String(r.level||''))} - ${escHtml(r.description||'')}</div>
+      </div>`;
+    });
+  }
+  html += '</div>';
+
+  document.getElementById('ctxContent').innerHTML = html;
+}
+
+// ── AI Analysis ───────────────────────────────────────────────────────────
+async function analyzeContext() {
+  if (!currentContext) return;
+
+  verdictLang   = 'en'; // reset to English on new analysis
+  const btn     = document.getElementById('analyzeBtn');
+  const spinner = document.getElementById('aiSpinner');
+  btn.disabled  = true;
+  btn.classList.add('loading');
+  spinner.style.display = 'block';
+
+  switchTab('tabVerdict', document.querySelectorAll('.tab-btn')[2]);
+
+  document.getElementById('verdictPlaceholder').style.display = 'flex';
+  document.getElementById('verdictContent').style.display = 'none';
+  document.getElementById('verdictPlaceholder').querySelector('h3').textContent = 'Analyzing...';
+  document.getElementById('verdictPlaceholder').querySelector('p').textContent =
+    'Processing the investigation context.';
+
+  try {
+    const res = await fetch('/api/fim/analyze', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(currentContext),
+    });
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    renderVerdict(data);
+  } catch(e) {
+    document.getElementById('verdictPlaceholder').querySelector('h3').textContent = 'Analysis failed';
+    document.getElementById('verdictPlaceholder').querySelector('p').textContent = e.message;
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+    spinner.style.display = 'none';
+  }
+}
+
+function renderVerdict(v) {
+  document.getElementById('verdictPlaceholder').style.display = 'none';
+  document.getElementById('verdictContent').style.display = 'block';
+
+  lastVerdict = v;
+  const lvl   = v.risk_level || 'LOW';
+  const score = v.risk_score || 0;
+  const techs = v.techniques || [];
+  const iocs  = v.ioc || [];
+  const tok   = v.tokens || {};
+
+  // Determine display language
+  const isEn  = (verdictLang === 'en');
+  const verdict_text = isEn ? (v.verdict_en || '') : (v.verdict_pt || v.verdict_en || '');
+  const summary      = isEn ? (v.summary_en || []) : (v.summary_pt || v.summary_en || []);
+  const recs         = isEn ? (v.recommendations_en || []) : (v.recommendations_pt || v.recommendations_en || []);
+  const sumLabel     = isEn ? 'Analysis' : 'Análise';
+  const recLabel     = isEn ? 'Recommended Actions' : 'Ações Recomendadas';
+  const iocLabel     = 'Indicators of Compromise';
+  const mitreLabel   = 'MITRE ATT&CK';
+  const langBtnLabel = isEn ? '🇧🇷 PT-BR' : '🇺🇸 EN';
+
+  let html = `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
+    <button onclick="toggleVerdictLang()" style="background:#374151;color:#9ca3af;border:1px solid #4b5563;
+      padding:4px 12px;border-radius:3px;cursor:pointer;font-size:11px;font-weight:700">
+      ${langBtnLabel}
+    </button>
+  </div>
+  <div class="verdict-card">
+    <div class="verdict-score">
+      <div class="score-circle score-${lvl}">${score}</div>
+      <div class="verdict-meta">
+        <h3>${escHtml(verdict_text)}</h3>
+        <span class="risk-level rl-${lvl}">${lvl}</span>
+      </div>
+    </div>
+    <div class="verdict-verdict">${escHtml(verdict_text)}</div>
+  </div>`;
+
+  // Summary
+  if (summary.length) {
+    html += `<div class="verdict-section">
+      <h4>${sumLabel}</h4>
+      <ul>${summary.map(s => `<li>${escHtml(s)}</li>`).join('')}</ul>
+    </div>`;
+  }
+
+  // Techniques
+  if (techs.length) {
+    html += `<div class="verdict-section"><h4>${mitreLabel}</h4>`;
+    techs.forEach(t => {
+      html += `<div class="technique-row">
+        <span class="technique-id">${escHtml(t.id||'')}</span>
+        <span class="technique-name">${escHtml(t.name||'')}</span>
+        <div class="confidence-bar-wrap">
+          <div class="confidence-bar" style="width:${t.confidence||0}%"></div>
+        </div>
+        <span style="color:#6b7280;font-size:10px;width:28px;text-align:right">${t.confidence||0}%</span>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // IOC
+  if (iocs.length) {
+    html += `<div class="verdict-section"><h4>${iocLabel}</h4>`;
+    iocs.forEach(i => {
+      html += `<div class="ioc-row">
+        <span class="ioc-type">${escHtml(i.type||'')}</span>
+        ${escHtml(i.value||'')}
+        ${i.note ? `<span style="color:#6b7280"> - ${escHtml(i.note)}</span>` : ''}
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  // Recommendations
+  if (recs.length) {
+    html += `<div class="verdict-section">
+      <h4>${recLabel}</h4>
+      <ul>${recs.map(r => `<li>${escHtml(r)}</li>`).join('')}</ul>
+    </div>`;
+  }
+
+  html += `<div class="tokens-info">model: ${escHtml(v.model||'')} | tokens in: ${tok.input||'?'} out: ${tok.output||'?'}</div>`;
+
+  document.getElementById('verdictContent').innerHTML = html;
+}
+
+// ── Language toggle ──────────────────────────────────────────────────────────
+function toggleVerdictLang() {
+  verdictLang = (verdictLang === 'en') ? 'pt' : 'en';
+  if (lastVerdict) renderVerdict(lastVerdict);
+}
+
+// ── Keyboard shortcut ─────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' &&
+      (document.activeElement.id === 'agentId' ||
+       document.activeElement.id === 'searchStr')) {
+    if (document.activeElement.id === 'agentId') loadAlerts();
+    // searchStr already uses oninput; Enter just blurs
+  }
+});
+
+// ── Resizable divider ─────────────────────────────────────────────────────
+(function() {
+  const resizer   = document.getElementById('panelResizer');
+  const listPanel = document.querySelector('.list-panel');
+  const mainEl    = document.querySelector('.main');
+  let dragging    = false;
+  let startX      = 0;
+  let startWidth  = 0;
+
+  resizer.addEventListener('mousedown', function(e) {
+    dragging   = true;
+    startX     = e.clientX;
+    startWidth = listPanel.offsetWidth;
+    resizer.classList.add('dragging');
+    document.body.style.cursor    = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', function(e) {
+    if (!dragging) return;
+    const delta    = e.clientX - startX;
+    const newWidth = Math.max(200, Math.min(startWidth + delta, mainEl.offsetWidth * 0.70));
+    listPanel.style.width = newWidth + 'px';
+  });
+
+  document.addEventListener('mouseup', function() {
+    if (!dragging) return;
+    dragging = false;
+    resizer.classList.remove('dragging');
+    document.body.style.cursor    = '';
+    document.body.style.userSelect = '';
+  });
+})();
+</script>
+</body>
+</html>
