@@ -7,6 +7,7 @@
 ![custom_rules](https://img.shields.io/badge/regras_customizadas-6-brightgreen)
 ![findings](https://img.shields.io/badge/achados_validados-15-blue)
 ![refuted](https://img.shields.io/badge/hip%C3%B3tese_refutada-1-lightgrey)
+![sysmon_rules](https://img.shields.io/badge/regras_sysmon_pesquisa-5-orange)
 ![status](https://img.shields.io/badge/status-validado_em_laborat%C3%B3rio-success)
 ![wazuh](https://img.shields.io/badge/wazuh-4.14.8-005571)
 ![platform](https://img.shields.io/badge/plataforma-Windows%20%7C%20Linux-lightgrey)
@@ -21,7 +22,7 @@
 
 O módulo FIM do Wazuh responde com precisão a três perguntas: **o que mudou, quando mudou e, com whodata, quem mudou**. Em produção, a maioria dos problemas de cobertura nasce em outro lugar: no subsistema de auditoria do sistema operacional por baixo do FIM, no comportamento interno do `wazuh-analysisd` ao correlacionar eventos e em falhas silenciosas que o `ossec.conf` não revela.
 
-Este repositório documenta um projeto de laboratório que foi do problema até a solução, com evidência em cada etapa. Ele entrega três capacidades construídas sobre o motor nativo de FIM:
+Este repositório documenta um projeto de laboratório que foi do problema até a solução, com evidência em cada etapa. Ele entrega quatro capacidades construídas sobre o motor nativo de FIM:
 
 **1. Regras de correlação de anomalia.** Detecção por threshold para operações massivas de arquivo (preparação de ransomware, anti-forense, entrega em massa de droppers), com `<if_matched_group>` e `<if_matched_sid>`. Seis regras customizadas, sem dependências externas.
 
@@ -29,7 +30,9 @@ Este repositório documenta um projeto de laboratório que foi do problema até 
 
 **3. Configuração endurecida de endpoints.** `ossec.conf` validado para Windows e Linux, com caminhos explícitos por usuário, `whodata` em diretórios de sistema e `realtime` em caminhos de usuário, mais os achados técnicos que o material oficial não cobre.
 
-Tudo isso está consolidado no **Handbook** (53 páginas, PT-BR), em [`docs/`](docs/).
+**4. Sysmon como camada complementar.** Cinco regras de pesquisa (100521, 100540, 100541, 100554 e 100555) que casam com as regras FIM por caminho e horário. Foram construídas a partir do repositório [Unified Sysmon Configs](https://github.com/mym0us3r/Unified-Sysmon-Configs) e estão disponíveis para a comunidade testar, modificar e adaptar à realidade do ambiente. Veja [Sysmon como Camada Complementar ao FIM](#sysmon-como-camada-complementar-ao-fim).
+
+Tudo isso está consolidado no **Handbook** (60 páginas, PT-BR), em [`docs/`](docs/).
 
 > Desenvolvido como parte do [Programa Wazuh Ambassador](https://wazuh.com/ambassadors-program/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
 
@@ -40,7 +43,7 @@ Tudo isso está consolidado no **Handbook** (53 páginas, PT-BR), em [`docs/`](d
 | Componente | Plataforma | Papel |
 |---|---|---|
 | WZ-SRV | Ubuntu 24.04 LTS, 3,9 GB de RAM, Wazuh 4.14.8 | Manager, Indexer, Dashboard e WPTV (Flask) |
-| LABDESK | Windows 11 Pro (build 26200), agente 4.14.8 | Agente Windows: FIM em sistema de arquivos e Registro |
+| LABDESK | Windows 11 Pro (build 26200), agente 4.14.8, Sysmon nativo (schema 4.91) | Agente Windows: FIM em sistema de arquivos e Registro, mais a camada Sysmon |
 | labnix | Ubuntu 24.04.5, kernel 6.17.0, agente 4.14.8 | Agente Linux atual: realtime, whodata e auditd |
 | pentlab | Kali Linux (kernel 6.x), agente 4.14.5 | Agente Linux das validações iniciais em 4.14.7 |
 | Inteligência | Claude Sonnet 4.6, VirusTotal, AlienVault OTX, AbuseIPDB | Análise e enriquecimento do FIM Alert Investigation |
@@ -162,6 +165,95 @@ Na regra 100301 em Windows, o `same_field` sobre campos `syscheck` não foi conf
 
 ---
 
+## Sysmon como Camada Complementar ao FIM
+
+O foco deste projeto é o Wazuh FIM. O Sysmon entra apenas como uma camada adicional: ele responde **qual processo** tocou o arquivo, enquanto o FIM responde **o que mudou** (hash, tamanho, atributos). Os dois sinais são pareados por caminho (`syscheck.path` no lado FIM, `data.win.eventdata.targetFilename` no lado Sysmon) e por horário.
+
+Os testes usaram o repositório [Unified Sysmon Configs](https://github.com/mym0us3r/Unified-Sysmon-Configs) como base. A partir dele foi escrito um novo conjunto de regras voltado à pesquisa, disponibilizado no GitHub para a comunidade testar, modificar e adaptar à realidade do ambiente onde será implementado. Os IDs das regras Sysmon começam em 100500, para não colidir com as regras FIM (100300 a 100310).
+
+Arquivo: `/var/ossec/etc/rules/fim_sysmon_rules.xml` (permissões `660 wazuh:wazuh`).
+
+| Regra | Nível | Evento Sysmon | Gatilho | MITRE | Par FIM |
+|---|---|---|---|---|---|
+| 100521 | 10 | EID 2 (data de criação alterada) | Timestamp alterado por interpretador (`powershell`, `pwsh`, `cmd`, `wscript`, `cscript`, `mshta`, `rundll32`, `regsvr32`) | T1070.006 | 550 (atributo `mtime`, whodata) |
+| 100540 | 12 | EID 11 (arquivo criado ou sobrescrito) | Executável ou script (`exe`, `dll`, `ps1`, `bat`, `vbs`, `js`, `hta`, `lnk` e outros) criado em caminho monitorado por interpretador | T1105, T1059 | 100310 (proxy da 554) |
+| 100541 | 6 | EID 11 | Qualquer arquivo criado ou sobrescrito em caminho monitorado | - | 100300 ou 100302 |
+| 100554 | 12 | EID 26 (exclusão de arquivo registrada) | Executável ou script excluído em caminho monitorado por interpretador | T1070.004 | 553 ou 100303 |
+| 100555 | 6 | EID 26 | Qualquer arquivo excluído em caminho monitorado | T1070.004 | 553 ou 100303 |
+
+### Pares validados
+
+Uma execução de cada cenário no LABDESK (12/10/2026, horário local). A ordem de chegada dos dois sinais varia, então o pareamento é por caminho e horário, não por sequência.
+
+| Cenário | FIM | Sysmon |
+|---|---|---|
+| Criar `.txt` | 100300 às 13:44:42.298 (whodata) | 100541 às 13:44:42.271 |
+| Sobrescrever via `cmd` | 100302 às 14:28:43.364 (scheduled, tamanho 22 para 29) | 100555 às 14:18:57.882 e 100541 às 14:18:57.966 |
+| Excluir `.txt` | 553 às 15:02:10.064 | 100555 às 15:02:10.109 |
+| Drop de executável pelo PowerShell | 100310 às 15:42:02.912 (scheduled, SHA-256 `23240ef9...af56cd3`, tamanho 98304) | 100540 às 15:41:56.911 |
+| Timestomping de `mtime` | 550 às 15:51:25.303 (whodata, `mtime` 1791831076 para 1559386800) | 100521 às 15:51:25.264 |
+| Limpeza: exclusão de script e executável | 553 às 15:56:09.851 e 100303 às 15:56:10.793 | 100555 às 15:56:09.864 e 100554 às 15:56:09.893 |
+
+**Casos somente FIM.** A sobrescrita com `Set-Content` (550 às 14:14:09.810), o append (550 às 14:38:54.918) e o `Rename-Item` (553 e 100310 às 14:51:45.810) não geraram evento no canal do Sysmon. Nesses casos o FIM é a única fonte, e esse é o argumento para tratar o Sysmon como camada e não como substituto.
+
+### Deploy
+
+```bash
+# 1. LABDESK (PowerShell elevado): aplicar a configuração do Sysmon
+sysmon64 -c sysmon-native-fimlab.xml
+
+# 2. WZ-SRV: copiar as regras, ajustar o dono e validar antes de reiniciar
+cp fim_sysmon_rules.xml /var/ossec/etc/rules/
+chown wazuh:wazuh /var/ossec/etc/rules/fim_sysmon_rules.xml
+chmod 660 /var/ossec/etc/rules/fim_sysmon_rules.xml
+/var/ossec/bin/wazuh-analysisd -t
+systemctl restart wazuh-manager
+```
+
+Consulta do Discover que mostra os dois sinais da pasta monitorada:
+
+```
+agent.name: "LABDESK" and (syscheck.path: *fim_sysmon_lab* or data.win.eventdata.targetFilename: *fim_sysmon_lab*)
+```
+
+### Notas técnicas
+
+- Caminhos Windows são armazenados com barras invertidas duplicadas, então as expressões PCRE2 usam quatro (`\\`) por separador.
+- As regras stock do Sysmon para EID 11 (por exemplo a 92203) casam primeiro e ocultariam as regras irmãs seguintes. Por isso 100540 e 100541 são filhas de `61613,92202,92203,92211,92212,92215,92223,92227`.
+- As regras 100554 e 100555 dependem de `<if_group>sysmon_event_26</if_group>`.
+- Use o campo `timestamp` para comparar horários. O `syscheck.mtime_after` aparece 3 horas antes do horário real no Discover.
+- Regras de frequência que tentaram correlacionar as duas fontes não dispararam nos testes de criação e exclusão, em nenhuma das ordens de chegada. Foram removidas, e o pareamento é feito no Discover com a consulta acima.
+
+> **Aviso de adaptação:** o caminho monitorado (`File_Server_Test_Folder`), os níveis e a lista de interpretadores são valores de laboratório. Ajuste ao ambiente antes de usar as regras em produção.
+
+Evidências (capturas reais do Wazuh Discover):
+
+![Configuração do Sysmon validada e aplicada com sysmon -c (schema 4.91)](docs/ev_sysmon_config_aplicada.png)
+
+![Criação: Sysmon 100541 seguido de FIM 100300](docs/ev_sysmon_criacao_100541_fim_100300.png)
+
+![Sobrescrita com Set-Content: somente FIM 550, sem alerta Sysmon](docs/ev_sysmon_setcontent_fim_550.png)
+
+![Sobrescrita via cmd.exe: Sysmon 100555 e 100541](docs/ev_sysmon_overwritecmd_100555_100541.png)
+
+![Append: somente FIM 550, sem alerta Sysmon](docs/ev_sysmon_append_fim_550.png)
+
+![Renomeação: FIM 553 e 100310, sem alerta Sysmon](docs/ev_sysmon_rename_fim_553_100310.png)
+
+![Exclusão: FIM 553 e Sysmon 100555](docs/ev_sysmon_exclusao_fim_553_100555.png)
+
+![Executável criado pelo PowerShell: Sysmon 100540](docs/ev_sysmon_executavel_100540.png)
+
+![Executável criado pelo PowerShell: FIM 100310 com hashes](docs/ev_sysmon_executavel_fim_100310.png)
+
+![Timestomping: Sysmon 100521 (EID 2)](docs/ev_sysmon_timestomp_100521.png)
+
+![Timestomping: FIM 550 (whodata, mtime)](docs/ev_sysmon_timestomp_fim_550.png)
+
+![Limpeza: Sysmon 100554 e FIM 100303](docs/ev_sysmon_limpeza_100554_100303.png)
+
+---
+
 ## Achados Técnicos
 
 Quinze achados validados e uma hipótese refutada, todos com evidência de laboratório. O detalhamento (comportamento, impacto, mitigação) está no capítulo 10 do Handbook.
@@ -209,6 +301,14 @@ wazuh-fim-adh/
 │   ├── ossec_agent_windows.conf      # Agente Windows: paths + ignores
 │   └── ossec_agent_linux.conf        # Agente Linux: whodata + realtime
 │
+├── sysmon/                           # Conjunto de pesquisa: Sysmon como camada sobre o FIM
+│   ├── rules/stock/fim_sysmon_rules.xml    # Regras 100521, 100540, 100541, 100554, 100555
+│   ├── rules/native/                       # Variante para o canal nativo do Sysmon
+│   ├── config/sysmon-native-fimlab.xml     # Configuração do Sysmon usada no laboratório
+│   ├── scripts/Invoke-FimSysmonLab.ps1     # Cenários do laboratório (Create, Overwrite, Delete, ...)
+│   ├── queries/discover-dql.md             # Consultas do Discover
+│   └── tools/gen_rules.py                  # Gerador das regras
+│
 ├── wptv-fim/                         # Extensão do WAZUH-Process-Tree-Viewer
 │   ├── logic_fim.py                  # Lógica de investigação FIM
 │   ├── server.py                     # Rotas /api/fim/*
@@ -216,8 +316,9 @@ wazuh-fim-adh/
 │       └── fim.html                  # Painel FIM Alert Investigation
 │
 ├── docs/
-│   ├── wazuh-fim-advanced-defenders-handbook-pt-br.docx   # Handbook completo (53 páginas)
-│   └── ev_*.png                      # Evidências do Wazuh Discover e do painel
+│   ├── wazuh-fim-advanced-defenders-handbook-pt-br.docx   # Handbook completo (60 páginas)
+│   ├── ev_*.png                      # Evidências do Wazuh Discover e do painel
+│   └── ev_sysmon_*.png               # Evidências Sysmon x FIM (12 capturas)
 │
 ├── README.md                         # English
 └── README.pt-BR.md                   # Português (BR)
@@ -541,10 +642,13 @@ Veredito LLM:
 | Data Manipulation | T1565 | 100300, 100302, 100304 |
 | Stored Data Manipulation | T1565.001 | 100300, 100302 |
 | Data Staged | T1074 | 100300 |
-| Ingress Tool Transfer | T1105 | 100301 |
+| Ingress Tool Transfer | T1105 | 100301, 100540 |
 | Lateral Tool Transfer | T1570 | 100301 |
 | Data Destruction | T1485 | 100303, 100304 |
 | Indicator Removal | T1070 | 100303 |
+| Timestomp | T1070.006 | 100521 |
+| File Deletion | T1070.004 | 100554, 100555 |
+| Command and Scripting Interpreter | T1059 | 100540 |
 | Disk Wipe | T1561 | 100303 |
 | Data Encrypted for Impact | T1486 | 100304 |
 
@@ -563,7 +667,7 @@ O capítulo 9 do Handbook cobre também o mapeamento de compliance (PCI DSS 4.0,
 | 5. Regras de Detecção de Anomalia | Seis regras, o padrão proxy da 100310 e evidências por plataforma |
 | 6. FIM Alert Investigation | Arquitetura, threat intelligence, veredito do LLM e validações |
 | 7. Regras Complementares | Ciclo de vida do agente (504, 505, 506), overflow inotify (560) e Registro |
-| 8. Perspectiva do Adversário | Evasão, timestomping e padrão de ransomware |
+| 8. Perspectiva do Adversário | Evasão, timestomping, padrão de ransomware e Sysmon como camada complementar (8.5) |
 | 9. Compliance e MITRE ATT&CK | PCI DSS, NIST, HIPAA, GDPR, TSC e técnicas |
 | 10. Achados Técnicos | 15 achados validados e 1 hipótese refutada |
 | 11. Configurações de Referência | Novidades da 4.14.8, `ossec.conf` endurecido, estado do servidor |
@@ -576,6 +680,8 @@ O capítulo 9 do Handbook cobre também o mapeamento de compliance (PCI DSS 4.0,
 - A regra 100301 não foi confirmada em Windows.
 - Os parâmetros de correlação são de laboratório e exigem baseline em produção.
 - O `syscheck frequency` de 60 s é um valor de laboratório para acelerar a validação.
+- As regras Sysmon são um conjunto de pesquisa, validado com uma execução de cada cenário no LABDESK. O Sysmon complementa o FIM e não o substitui: algumas operações (sobrescrita com `Set-Content`, append, rename) não geraram evento Sysmon nos testes.
+- Regras de frequência entre as duas fontes (FIM e Sysmon) não dispararam nos testes, então o pareamento é feito no Discover por caminho e horário.
 
 ---
 
@@ -589,6 +695,8 @@ O capítulo 9 do Handbook cobre também o mapeamento de compliance (PCI DSS 4.0,
 - [MITRE ATT&CK - T1485 Data Destruction](https://attack.mitre.org/techniques/T1485/)
 - [MITRE ATT&CK - T1486 Data Encrypted for Impact](https://attack.mitre.org/techniques/T1486/)
 - [MITRE ATT&CK - T1105 Ingress Tool Transfer](https://attack.mitre.org/techniques/T1105/)
+- [Unified Sysmon Configs](https://github.com/mym0us3r/Unified-Sysmon-Configs)
+- [Sysmon - Microsoft Sysinternals](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon)
 - [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer)
 - [DIRTY-FRAG Detection with Wazuh 4.14.4](https://github.com/mym0us3r/DIRTY-FRAG-Detection-with-Wazuh-4.14.4)
 - [COPY-FAIL Detection with Wazuh 4.14.4](https://github.com/mym0us3r/COPY-FAIL-Detection-with-Wazuh-4.14.4)
@@ -608,7 +716,7 @@ Wazuh Ambassador | Detection Engineering | Blue Team
 
 ---
 
-*Regras de detecção, decoders, painel FIM Alert Investigation e configurações de agente validados no Wazuh 4.14.8, Windows 11 Pro build 26200, Ubuntu 24.04.5 kernel 6.17.0 e Claude Sonnet 4.6.*
+*Regras de detecção, decoders, painel FIM Alert Investigation e configurações de agente validados no Wazuh 4.14.8, Windows 11 Pro build 26200, Sysmon schema 4.91, Ubuntu 24.04.5 kernel 6.17.0 e Claude Sonnet 4.6.*
 
 ---
 
@@ -620,6 +728,17 @@ Wazuh Ambassador | Detection Engineering | Blue Team
 | Handbook revisado | 53 páginas, 15 achados validados e 1 hipótese refutada, com 9 novos prints do Wazuh Discover e legenda em cada figura. |
 | Acesso ao Indexer documentado | O WPTV e o FIM Alert Investigation consultam o Wazuh Indexer com o usuário de serviço somente leitura `wptv_svc` (role `wptv_role`, índices `wazuh-alerts-*` e `wazuh-archives-*`). Credenciais em `/etc/wazuh-process-tree/wptv.env`. |
 | Regra de verificação | Confirme o realtime por `syscheck.mode` no `archives.json`, use `strace -y` incluindo `pselect6` e não consulte o `fim.db` ativo. |
+
+---
+
+## Atualização 2026-10-12
+
+| Mudança | Detalhe |
+|---|---|
+| Sysmon como camada complementar | Cinco regras de pesquisa (100521, 100540, 100541, 100554, 100555) pareadas com as regras FIM por caminho e horário, construídas a partir do repositório [Unified Sysmon Configs](https://github.com/mym0us3r/Unified-Sysmon-Configs). Disponíveis para a comunidade testar, modificar e adaptar. |
+| Pares validados | Criação, sobrescrita via `cmd`, exclusão, drop de executável, timestomping e limpeza, cada um com o alerta FIM e o alerta Sysmon no mesmo caminho. |
+| Casos somente FIM documentados | Sobrescrita com `Set-Content`, append e rename não geraram evento Sysmon: o FIM é a única fonte nesses casos. |
+| Handbook revisado | 60 páginas, com a nova seção 8.5 "Sysmon como Camada Complementar ao FIM". |
 
 ---
 
