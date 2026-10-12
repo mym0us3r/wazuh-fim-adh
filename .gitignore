@@ -216,3 +216,31 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+# ---------------------------------------------------------------------------
+# Project specific: wazuh-fim-adh / wptv-fim
+# ---------------------------------------------------------------------------
+
+# Secrets: wptv.env holds the Indexer password and the API keys
+# (Anthropic, VirusTotal, OTX, AbuseIPDB). Never commit it.
+wptv.env
+*.env
+!*.env.example
+
+# Certificates and private keys (for example the Indexer root-ca.pem copy)
+*.pem
+*.key
+*.crt
+
+# Local backups and scratch files
+*.bak
+*.orig
+*.swp
+*.swo
+*~
+
+# Internal planning notes, not published
+ROADMAP.md
+
+# The OpenSearch Dashboards plugin bundle must be versioned.
+# "target/" above (PyBuilder) would otherwise ignore it.
+!wptv-fim/plugin/target/
