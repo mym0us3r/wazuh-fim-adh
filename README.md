@@ -22,6 +22,20 @@
 
 The Wazuh FIM module answers three questions with precision: **what changed, when it changed and, with whodata, who changed it**. In production, most coverage problems come from somewhere else: the operating system's audit subsystem underneath FIM, the internal behavior of `wazuh-analysisd` when it correlates events, and silent failures that `ossec.conf` does not reveal.
 
+### Why this research exists
+
+The same questions about FIM come back again and again in the Wazuh community, on Slack, in forums, on LinkedIn and on other platforms, especially from users who are deploying FIM in production for the first time. The pattern is almost always the same: creation and modification events arrive normally, but deletion events do not, or the behavior is exactly the opposite.
+
+The usual assumption is that the fix is a single missing line in `ossec.conf`. In some cases it is. In many others the cause sits one layer below the FIM configuration: the operating system's audit subsystem, or a Group Policy that is still applied to the server's OU and was forgotten or went unnoticed during the investigation. A typical example is a Windows File Server agent on 4.14.7 that reports no FIM events at all (Figure 1 of the Handbook).
+
+That scenario was one of the main motivations for this work. The goal is a quick, clear and objective reference for people who do not yet have advanced Wazuh knowledge, especially in the FIM context. It maps where each piece of the configuration lives, on the Wazuh server and on the Windows and Linux endpoints. It also shows how Linux Audit rules are actually built and persisted, and it documents the failure modes behind most reports of deletion events that never reach Wazuh.
+
+Everything was validated in a dedicated lab, with Windows and Linux agents monitored by the same Wazuh server, and every finding is backed by evidence from Wazuh Discover. The repository exists to make that knowledge reusable: the correlation rules, the agent configurations and the findings can be deployed, tested and adapted instead of rediscovered.
+
+> **Coverage can disappear without an error in the log.** Two cases were validated: on Windows, the whodata SACL is not recovered after a manager restart (finding AO-7); on Linux, a path with `/*` in `<directories>` registers watches on individual files and leaves new files without realtime coverage (finding AO-8). Evidence and mitigations are in chapter 10 of the Handbook.
+
+### What this repository delivers
+
 This repository documents a lab project that went from the problem to the solution, with evidence at every step. It delivers four capabilities built on the native FIM engine:
 
 **1. Anomaly correlation rules.** Threshold-based detection of mass file operations (ransomware staging, anti-forensics, bulk dropper delivery), using `<if_matched_group>` and `<if_matched_sid>`. Six custom rules, no external dependencies.
@@ -162,95 +176,6 @@ File: `/var/ossec/etc/rules/fim_anomaly_rules.xml` (permissions `660 wazuh:wazuh
 | 100304 | 5+ mixed events (level 14) | CONFIRMED | CONFIRMED |
 
 For rule 100301 on Windows, `same_field` over `syscheck` fields was not confirmed in the tests of 2026-09-16. Windows endpoints keep creation coverage through 100300 and escalation coverage through 100304.
-
----
-
-## Sysmon as a Complementary Layer to FIM
-
-The focus of this project is Wazuh FIM. Sysmon enters only as an additional layer: it answers **which process** touched the file, while FIM answers **what changed** (hash, size, attributes). The two signals are paired by path (`syscheck.path` on the FIM side, `data.win.eventdata.targetFilename` on the Sysmon side) and by time.
-
-The tests used the [Unified Sysmon Configs](https://github.com/mym0us3r/Unified-Sysmon-Configs) repository as the base. From it, a new set of rules aimed at research was written and is made available on GitHub for the community to test, modify and adapt to the reality of the environment where it will be deployed. The Sysmon rule IDs start at 100500, so they do not collide with the FIM rules (100300 to 100310).
-
-File: `/var/ossec/etc/rules/fim_sysmon_rules.xml` (permissions `660 wazuh:wazuh`).
-
-| Rule | Level | Sysmon event | Trigger | MITRE | FIM pair |
-|---|---|---|---|---|---|
-| 100521 | 10 | EID 2 (file creation time changed) | Timestamp changed by an interpreter (`powershell`, `pwsh`, `cmd`, `wscript`, `cscript`, `mshta`, `rundll32`, `regsvr32`) | T1070.006 | 550 (attribute `mtime`, whodata) |
-| 100540 | 12 | EID 11 (file created or overwritten) | Executable or script (`exe`, `dll`, `ps1`, `bat`, `vbs`, `js`, `hta`, `lnk` and others) created in a watched path by an interpreter | T1105, T1059 | 100310 (proxy for 554) |
-| 100541 | 6 | EID 11 | Any file created or overwritten in a watched path | - | 100300 or 100302 |
-| 100554 | 12 | EID 26 (file delete logged) | Executable or script deleted in a watched path by an interpreter | T1070.004 | 553 or 100303 |
-| 100555 | 6 | EID 26 | Any file deleted in a watched path | T1070.004 | 553 or 100303 |
-
-### Validated pairs
-
-One run of each scenario on LABDESK (2026-10-12, local time). The arrival order of the two signals varies, so pair them by path and time, not by sequence.
-
-| Scenario | FIM | Sysmon |
-|---|---|---|
-| Create `.txt` | 100300 at 13:44:42.298 (whodata) | 100541 at 13:44:42.271 |
-| Overwrite via `cmd` | 100302 at 14:28:43.364 (scheduled, size 22 to 29) | 100555 at 14:18:57.882 and 100541 at 14:18:57.966 |
-| Delete `.txt` | 553 at 15:02:10.064 | 100555 at 15:02:10.109 |
-| Drop of an executable by PowerShell | 100310 at 15:42:02.912 (scheduled, SHA-256 `23240ef9...af56cd3`, size 98304) | 100540 at 15:41:56.911 |
-| Timestomping of `mtime` | 550 at 15:51:25.303 (whodata, `mtime` 1791831076 to 1559386800) | 100521 at 15:51:25.264 |
-| Cleanup: delete script and executable | 553 at 15:56:09.851 and 100303 at 15:56:10.793 | 100555 at 15:56:09.864 and 100554 at 15:56:09.893 |
-
-**FIM-only cases.** `Set-Content` overwrite (550 at 14:14:09.810), append (550 at 14:38:54.918) and `Rename-Item` (553 and 100310 at 14:51:45.810) produced no event on the Sysmon channel. In these cases FIM is the only source, which is the argument for treating Sysmon as a layer and not as a replacement.
-
-### Deployment
-
-```bash
-# 1. LABDESK (elevated PowerShell): apply the Sysmon configuration
-sysmon64 -c sysmon-native-fimlab.xml
-
-# 2. WZ-SRV: copy the rules, fix ownership and validate before restarting
-cp fim_sysmon_rules.xml /var/ossec/etc/rules/
-chown wazuh:wazuh /var/ossec/etc/rules/fim_sysmon_rules.xml
-chmod 660 /var/ossec/etc/rules/fim_sysmon_rules.xml
-/var/ossec/bin/wazuh-analysisd -t
-systemctl restart wazuh-manager
-```
-
-Discover query that shows both signals from the monitored folder:
-
-```
-agent.name: "LABDESK" and (syscheck.path: *fim_sysmon_lab* or data.win.eventdata.targetFilename: *fim_sysmon_lab*)
-```
-
-### Technical notes
-
-- Windows paths are stored with doubled backslashes, so the PCRE2 expressions use four (`\\`) per separator.
-- Stock Sysmon rules for EID 11 (for example 92203) match first and would shadow later sibling rules. For this reason 100540 and 100541 are children of `61613,92202,92203,92211,92212,92215,92223,92227`.
-- Rules 100554 and 100555 hang from `<if_group>sysmon_event_26</if_group>`.
-- Use the `timestamp` field for time comparison. `syscheck.mtime_after` is displayed 3 hours earlier in Discover.
-- Frequency rules that tried to correlate the two sources did not fire in the Create and Delete tests, in either arrival order. They were removed, and pairing is done in Discover with the query above.
-
-> **Adaptation warning:** the watched path (`File_Server_Test_Folder`), the levels and the interpreter list are lab values. Adjust them to the environment before using the rules in production.
-
-Evidence (real captures from Wazuh Discover):
-
-![Sysmon configuration validated and applied with sysmon -c (schema 4.91)](docs/ev_sysmon_config_aplicada.png)
-
-![Create: Sysmon 100541 followed by FIM 100300](docs/ev_sysmon_criacao_100541_fim_100300.png)
-
-![Overwrite with Set-Content: FIM 550 only, no Sysmon alert](docs/ev_sysmon_setcontent_fim_550.png)
-
-![Overwrite via cmd.exe: Sysmon 100555 and 100541](docs/ev_sysmon_overwritecmd_100555_100541.png)
-
-![Append: FIM 550 only, no Sysmon alert](docs/ev_sysmon_append_fim_550.png)
-
-![Rename: FIM 553 and 100310, no Sysmon alert](docs/ev_sysmon_rename_fim_553_100310.png)
-
-![Delete: FIM 553 and Sysmon 100555](docs/ev_sysmon_exclusao_fim_553_100555.png)
-
-![Executable dropped by PowerShell: Sysmon 100540](docs/ev_sysmon_executavel_100540.png)
-
-![Executable dropped by PowerShell: FIM 100310 with hashes](docs/ev_sysmon_executavel_fim_100310.png)
-
-![Timestomping: Sysmon 100521 (EID 2)](docs/ev_sysmon_timestomp_100521.png)
-
-![Timestomping: FIM 550 (whodata, mtime)](docs/ev_sysmon_timestomp_fim_550.png)
-
-![Cleanup: Sysmon 100554 and FIM 100303](docs/ev_sysmon_limpeza_100554_100303.png)
 
 ---
 
@@ -635,6 +560,121 @@ LLM verdict:
 
 ---
 
+## Sysmon as a Complementary Layer to FIM
+
+The focus of this project is Wazuh FIM. Sysmon enters only as an additional layer: it answers **which process** touched the file, while FIM answers **what changed** (hash, size, attributes). The two signals are paired by path (`syscheck.path` on the FIM side, `data.win.eventdata.targetFilename` on the Sysmon side) and by time.
+
+The tests used the [Unified Sysmon Configs](https://github.com/mym0us3r/Unified-Sysmon-Configs) repository as the base. From it, a new set of rules aimed at research was written and is made available on GitHub for the community to test, modify and adapt to the reality of the environment where it will be deployed. The Sysmon rule IDs start at 100500, so they do not collide with the FIM rules (100300 to 100310).
+
+File: `/var/ossec/etc/rules/fim_sysmon_rules.xml` (permissions `660 wazuh:wazuh`).
+
+| Rule | Level | Sysmon event | Trigger | MITRE | FIM pair |
+|---|---|---|---|---|---|
+| 100521 | 10 | EID 2 (file creation time changed) | Timestamp changed by an interpreter (`powershell`, `pwsh`, `cmd`, `wscript`, `cscript`, `mshta`, `rundll32`, `regsvr32`) | T1070.006 | 550 (attribute `mtime`, whodata) |
+| 100540 | 12 | EID 11 (file created or overwritten) | Executable or script (`exe`, `dll`, `ps1`, `bat`, `vbs`, `js`, `hta`, `lnk` and others) created in a watched path by an interpreter | T1105, T1059 | 100310 (proxy for 554) |
+| 100541 | 6 | EID 11 | Any file created or overwritten in a watched path | - | 100300 or 100302 |
+| 100554 | 12 | EID 26 (file delete logged) | Executable or script deleted in a watched path by an interpreter | T1070.004 | 553 or 100303 |
+| 100555 | 6 | EID 26 | Any file deleted in a watched path | T1070.004 | 553 or 100303 |
+
+### Validated pairs
+
+One run of each scenario on LABDESK (2026-10-12, local time). The arrival order of the two signals varies, so pair them by path and time, not by sequence.
+
+| Scenario | FIM | Sysmon |
+|---|---|---|
+| Create `.txt` | 100300 at 13:44:42.298 (whodata) | 100541 at 13:44:42.271 |
+| Overwrite via `cmd` | 100302 at 14:28:43.364 (scheduled, size 22 to 29) | 100555 at 14:18:57.882 and 100541 at 14:18:57.966 |
+| Delete `.txt` | 553 at 15:02:10.064 | 100555 at 15:02:10.109 |
+| Drop of an executable by PowerShell | 100310 at 15:42:02.912 (scheduled, SHA-256 `23240ef9...af56cd3`, size 98304) | 100540 at 15:41:56.911 |
+| Timestomping of `mtime` | 550 at 15:51:25.303 (whodata, `mtime` 1791831076 to 1559386800) | 100521 at 15:51:25.264 |
+| Cleanup: delete script and executable | 553 at 15:56:09.851 and 100303 at 15:56:10.793 | 100555 at 15:56:09.864 and 100554 at 15:56:09.893 |
+
+**FIM-only cases.** `Set-Content` overwrite (550 at 14:14:09.810), append (550 at 14:38:54.918) and `Rename-Item` (553 and 100310 at 14:51:45.810) produced no event on the Sysmon channel. In these cases FIM is the only source, which is the argument for treating Sysmon as a layer and not as a replacement.
+
+### Deployment
+
+```bash
+# 1. LABDESK (elevated PowerShell): apply the Sysmon configuration
+sysmon64 -c sysmon-native-fimlab.xml
+
+# 2. WZ-SRV: copy the rules, fix ownership and validate before restarting
+cp fim_sysmon_rules.xml /var/ossec/etc/rules/
+chown wazuh:wazuh /var/ossec/etc/rules/fim_sysmon_rules.xml
+chmod 660 /var/ossec/etc/rules/fim_sysmon_rules.xml
+/var/ossec/bin/wazuh-analysisd -t
+systemctl restart wazuh-manager
+```
+
+Discover query that shows both signals from the monitored folder:
+
+```
+agent.name: "LABDESK" and (syscheck.path: *fim_sysmon_lab* or data.win.eventdata.targetFilename: *fim_sysmon_lab*)
+```
+
+### Technical notes
+
+- Windows paths are stored with doubled backslashes, so the PCRE2 expressions use four (`\\`) per separator.
+- Stock Sysmon rules for EID 11 (for example 92203) match first and would shadow later sibling rules. For this reason 100540 and 100541 are children of `61613,92202,92203,92211,92212,92215,92223,92227`.
+- Rules 100554 and 100555 hang from `<if_group>sysmon_event_26</if_group>`.
+- Use the `timestamp` field for time comparison. `syscheck.mtime_after` is displayed 3 hours earlier in Discover.
+- Frequency rules that tried to correlate the two sources did not fire in the Create and Delete tests, in either arrival order. They were removed, and pairing is done in Discover with the query above.
+
+> **Adaptation warning:** the watched path (`File_Server_Test_Folder`), the levels and the interpreter list are lab values. Adjust them to the environment before using the rules in production.
+
+Evidence (real captures from Wazuh Discover):
+
+The figure numbers follow the Handbook (section 8.5). Figure 56 is a terminal capture; Figures 57 to 67 are Wazuh Discover queries, and each caption lists the `rule.id` of the alerts shown.
+
+![Figure 56](docs/ev_sysmon_config_aplicada.png)
+
+*Figure 56 - Sysmon XML validation and application of the native Sysmon configuration with sysmon -c on LABDESK (schema 4.91)*
+
+![Figure 57](docs/ev_sysmon_criacao_100541_fim_100300.png)
+
+*Figure 57 - Creation of a.txt on LABDESK: rule 100541 (Sysmon, EID 11, 13:44:42.241 and 13:44:42.271) followed by 100300 (FIM, 13:44:42.298)*
+
+![Figure 58](docs/ev_sysmon_setcontent_fim_550.png)
+
+*Figure 58 - Overwrite with Set-Content: alert 550 (FIM) at 14:14:09.810, with no associated Sysmon alert (range 14:13 to 14:21)*
+
+![Figure 59](docs/ev_sysmon_overwritecmd_100555_100541.png)
+
+*Figure 59 - Overwrite with cmd.exe redirection: rules 100555 (Sysmon, EID 26, 14:18:57.882) and 100541 (Sysmon, EID 11, 14:18:57.966) with image cmd.exe*
+
+![Figure 60](docs/ev_sysmon_append_fim_550.png)
+
+*Figure 60 - Append a line to a.txt: combined query by path (FIM or Sysmon) returns only alert 550 (FIM) at 14:38:54.918*
+
+![Figure 61](docs/ev_sysmon_rename_fim_553_100310.png)
+
+*Figure 61 - Rename files: FIM alerts 553 (a.txt) and 100310 (b.txt) at 14:51:45.810, with no associated Sysmon alert*
+
+![Figure 62](docs/ev_sysmon_exclusao_fim_553_100555.png)
+
+*Figure 62 - Deletion of b.txt: alert 553 (FIM) and alert 100555 (Sysmon, EID 26) on the same path*
+
+![Figure 63](docs/ev_sysmon_executavel_100540.png)
+
+*Figure 63 - Copy of the executable tool_ps.exe by PowerShell: alert 100540 (Sysmon, EID 11)*
+
+![Figure 64](docs/ev_sysmon_executavel_fim_100310.png)
+
+*Figure 64 - Same executable in FIM: alert 100310 (proxy for 554, scheduled mode) with the file's MD5 and SHA-256 hashes*
+
+![Figure 65](docs/ev_sysmon_timestomp_100521.png)
+
+*Figure 65 - Change of a.txt dates (timestomp): alert 100521 (Sysmon, EID 2)*
+
+![Figure 66](docs/ev_sysmon_timestomp_fim_550.png)
+
+*Figure 66 - Same operation in FIM: alert 550 (whodata mode) with the mtime attribute changed*
+
+![Figure 67](docs/ev_sysmon_limpeza_100554_100303.png)
+
+*Figure 67 - Cleanup of the test files: 553 and 100555 (a.txt), 100554 (Sysmon, EID 26) and 100303 (FIM) for tool_ps.exe*
+
+---
+
 ## MITRE ATT&CK Mapping
 
 | Technique | ID | Rules |
@@ -700,8 +740,6 @@ The Handbook is written in PT-BR. Chapters:
 - [Unified Sysmon Configs](https://github.com/mym0us3r/Unified-Sysmon-Configs)
 - [Sysmon - Microsoft Sysinternals](https://learn.microsoft.com/en-us/sysinternals/downloads/sysmon)
 - [WAZUH-Process-Tree-Viewer](https://github.com/mym0us3r/WAZUH-Process-Tree-Viewer)
-- [DIRTY-FRAG Detection with Wazuh 4.14.4](https://github.com/mym0us3r/DIRTY-FRAG-Detection-with-Wazuh-4.14.4)
-- [COPY-FAIL Detection with Wazuh 4.14.4](https://github.com/mym0us3r/COPY-FAIL-Detection-with-Wazuh-4.14.4)
 
 ---
 
