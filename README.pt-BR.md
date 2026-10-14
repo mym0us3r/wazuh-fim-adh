@@ -679,6 +679,30 @@ A numeração das figuras segue o Handbook (seção 8.5). A Figura 56 é uma cap
 
 ---
 
+## Inventário de Regras
+
+Contagens verificadas em 2026-10-14 no servidor Wazuh (WZ-SRV) e no endpoint Linux (labnix). A contagem de regras do servidor é igual à deste repositório.
+
+### Regras do Wazuh (manager)
+
+| Arquivo | Regras | IDs | O que fazem |
+|---|---|---|---|
+| `rules/fim_anomaly_rules.xml` | 6 | 100310, 100300 a 100304 | Correlação de anomalia sobre os eventos nativos do FIM (554 criação, 550 modificação, 553 exclusão). A 100310 é a regra proxy que isola os contadores da 100300 e da 100301. As regras 100300 a 100304 geram alertas para criação em massa, mesmo hash em vários diretórios, modificação em massa, exclusão em massa e atividade mista em 10 minutos. |
+| `sysmon/fim_sysmon_rules.xml` | 5 | 100521, 100540, 100541, 100554, 100555 | Conjunto de pesquisa que lê eventos do Sysmon (EID 2, 11 e 26) para que cada um seja pareado com o evento FIM da mesma operação de arquivo. Não substitui o FIM. |
+| **Total** | **11** | | |
+
+As regras estão descritas em [Regras de Correlação de Anomalia](#regras-de-correlação-de-anomalia) e em [Sysmon como Camada Complementar ao FIM](#sysmon-como-camada-complementar-ao-fim).
+
+### Regras do Linux Audit (labnix)
+
+| Origem | Regras | O que fazem |
+|---|---|---|
+| `/etc/audit/rules.d/net_connect.rules` | 4 | Registram a syscall `connect()` (64 e 32 bits) para usuários com uid 1000 ou maior (chave `net_connect_user`) e para o root (chave `net_connect_root`). Fornecem o campo `data.audit.addr` que o FIM Alert Investigation usa para consultar o AbuseIPDB (achado AO-5). |
+| `/etc/audit/rules.d/audit.rules` | 0 | O arquivo não tem linhas de regra `-w` ou `-a`. |
+| Geradas pelo Wazuh (chave `wazuh_fim`) | 6 | Carregadas no kernel quando o agente inicia, para os diretórios monitorados com `whodata`. Não ficam em `/etc/audit/rules.d/`. Verificar com `auditctl -l \| grep wazuh_fim`. |
+
+---
+
 ## Mapeamento MITRE ATT&CK
 
 | Técnica | ID | Regras |
@@ -820,6 +844,7 @@ Wazuh Ambassador | Detection Engineering | Blue Team
 | Revisão contra a documentação oficial | Afirmações conferidas com a documentação Wazuh 4.14 e o ruleset 4.14.8. Alinhados à documentação: o `windows_audit_interval` move o whodata para realtime em caso de divergência e não reaplica a SACL (seção 3.5, achado AO-7); a persistência por chave Run gera a regra 752 (valor adicionado); as regras nativas etiquetam o PCI DSS como `11.5`; a restrição de caminhos UNC passa a citar as notas de versão 4.13.0 (#30060). |
 | Observações de laboratório identificadas | Os achados AC-1 a AC-7 e AO-1 a AO-8 estão marcados como observações de laboratório na 4.14.x, não como comportamentos declarados na documentação oficial. |
 | Componente comunitário | O FIM Alert Investigation é declarado como componente comunitário, fora da plataforma Wazuh e sem suporte da Wazuh. |
+| Inventário de regras | Nova seção com a contagem de regras por arquivo (11 regras Wazuh) e as regras do Linux Audit no labnix, com o que cada grupo faz. |
 
 ---
 
