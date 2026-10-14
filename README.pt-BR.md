@@ -816,7 +816,7 @@ Wazuh Ambassador | Detection Engineering | Blue Team
 
 | Mudança | Detalhe |
 |---|---|
-| Handbook em EN-US | O Handbook passa a ser entregue em EN-US, com a versão PT-BR mantida em `docs/` para referência. |
+| Handbook em EN-US | O Handbook passa a ser entregue em EN-US (62 páginas), com a versão PT-BR (63 páginas) mantida em `docs/` para referência. Contagem de páginas conforme exibida no Microsoft Word. |
 | Revisão contra a documentação oficial | Afirmações conferidas com a documentação Wazuh 4.14 e o ruleset 4.14.8. Alinhados à documentação: o `windows_audit_interval` move o whodata para realtime em caso de divergência e não reaplica a SACL (seção 3.5, achado AO-7); a persistência por chave Run gera a regra 752 (valor adicionado); as regras nativas etiquetam o PCI DSS como `11.5`; a restrição de caminhos UNC passa a citar as notas de versão 4.13.0 (#30060). |
 | Observações de laboratório identificadas | Os achados AC-1 a AC-7 e AO-1 a AO-8 estão marcados como observações de laboratório na 4.14.x, não como comportamentos declarados na documentação oficial. |
 | Componente comunitário | O FIM Alert Investigation é declarado como componente comunitário, fora da plataforma Wazuh e sem suporte da Wazuh. |
