@@ -32,7 +32,7 @@ Esse cenário foi uma das principais motivações para este trabalho. A expectat
 
 Tudo foi validado em laboratório próprio, com agentes Windows e Linux monitorados pelo mesmo servidor Wazuh, e cada achado tem evidência do Wazuh Discover. O repositório existe para tornar esse conhecimento reutilizável: as regras de correlação, as configurações de agente e os achados podem ser implantados, testados e adaptados em vez de redescobertos.
 
-> **A cobertura pode desaparecer sem erro no log.** Dois casos foram validados: no Windows, a SACL do whodata não é recuperada após o restart do manager (achado AO-7); no Linux, um caminho com `/*` em `<directories>` registra watches em arquivos individuais e deixa os arquivos novos sem cobertura realtime (achado AO-8). Evidências e mitigações no capítulo 10 do Handbook.
+> **A cobertura pode desaparecer sem erro no log.** Dois casos foram validados: no Windows, a cobertura whodata não é restaurada após o restart do manager (achado AO-7); no Linux, um caminho com `/*` em `<directories>` registra watches em arquivos individuais e deixa os arquivos novos sem cobertura realtime (achado AO-8). Evidências e mitigações no capítulo 10 do Handbook.
 
 ### O que este repositório entrega
 
@@ -46,7 +46,7 @@ Este repositório documenta um projeto de laboratório que foi do problema até 
 
 **4. Sysmon como camada complementar.** Cinco regras de pesquisa (100521, 100540, 100541, 100554 e 100555) que casam com as regras FIM por caminho e horário. Foram construídas a partir do repositório [Unified Sysmon Configs](https://github.com/mym0us3r/Unified-Sysmon-Configs) e estão disponíveis para a comunidade testar, modificar e adaptar à realidade do ambiente. Veja [Sysmon como Camada Complementar ao FIM](#sysmon-como-camada-complementar-ao-fim).
 
-Tudo isso está consolidado no **Handbook** (60 páginas, PT-BR), em [`docs/`](docs/).
+Tudo isso está consolidado no **Handbook** (EN-US, com versão PT-BR para referência), em [`docs/`](docs/).
 
 > Desenvolvido como parte do [Programa Wazuh Ambassador](https://wazuh.com/ambassadors-program/?utm_source=ambassadors&utm_medium=referral&utm_campaign=ambassadors+program).
 
@@ -59,7 +59,7 @@ Tudo isso está consolidado no **Handbook** (60 páginas, PT-BR), em [`docs/`](d
 | WZ-SRV | Ubuntu 24.04 LTS, 3,9 GB de RAM, Wazuh 4.14.8 | Manager, Indexer, Dashboard e WPTV (Flask) |
 | LABDESK | Windows 11 Pro (build 26200), agente 4.14.8, Sysmon nativo (schema 4.91) | Agente Windows: FIM em sistema de arquivos e Registro, mais a camada Sysmon |
 | labnix | Ubuntu 24.04.5, kernel 6.17.0, agente 4.14.8 | Agente Linux atual: realtime, whodata e auditd |
-| pentlab | Kali Linux (kernel 6.x), agente 4.14.5 | Agente Linux das validações iniciais em 4.14.7 |
+| pentlab | Kali Linux (kernel 6.x), agente 4.14.7 | Agente Linux das validações iniciais |
 | Inteligência | Claude Sonnet 4.6, VirusTotal, AlienVault OTX, AbuseIPDB | Análise e enriquecimento do FIM Alert Investigation |
 
 Parte dos cenários de correlação foi executada em 4.14.7 e o pipeline atual opera em 4.14.8. Os números de volume e latência refletem um servidor de 3,9 GB de RAM e não substituem um dimensionamento de produção.
@@ -107,7 +107,7 @@ Durante a validação em Linux, uma janela de eventos realtime ausentes no labni
 - O `strace` do `syscheckd` mostra `read()` no descritor `anon_inode:inotify`. A observação original havia filtrado a syscall errada: o daemon espera com `pselect6`, que o filtro antigo não capturava.
 - Os 21 eventos `added` sem regra associada são compatíveis com a criação encoberta pela regra proxy 100310 enquanto operava em nível 0 (efeito do achado AC-7), e não com eventos perdidos.
 
-**Veredito: NÃO PROCEDE.** Não é issue no upstream. O achado AP-1 permanece no Handbook como hipótese refutada, com o método e as falhas que a produziram. O aprendizado útil é prático: para confirmar que o realtime entrega eventos, consulte `syscheck.mode` no `archives.json` (ou em `wazuh-archives-*`) e nunca consulte o `fim.db` ativo (retorna `database is locked`).
+**Veredito: NÃO PROCEDE.** Não é issue no upstream. O achado AP-1 está documentado neste README como hipótese refutada, com o método e as falhas que a produziram. Ele não faz parte dos 15 achados do Handbook. O aprendizado útil é prático: para confirmar que o realtime entrega eventos, consulte `syscheck.mode` no `archives.json` (ou em `wazuh-archives-*`) e nunca consulte o `fim.db` ativo (retorna `database is locked`).
 
 ---
 
@@ -160,7 +160,7 @@ Arquivo: `/var/ossec/etc/rules/fim_anomaly_rules.xml` (permissões `660 wazuh:wa
 
 > **Nota técnica 1:** `<if_sid>` define uma regra filha (dispara no mesmo evento). `<if_matched_sid>` define correlação temporal (contador independente, `frequency` eventos dentro do `timeframe`). A 100310 usa o primeiro mecanismo para que 100300 e 100301 usem o segundo sobre grupos distintos.
 
-> **Nota técnica 2:** `<if_matched_sid>` com SIDs separados por vírgula não funciona em regras de correlação no Wazuh 4.14.x. A 100304 usa `<if_matched_group>syscheck_file</if_matched_group>` para cobrir 550, 553 e 554 em uma única correlação.
+> **Nota técnica 2:** Nos testes de laboratório no Wazuh 4.14.x, `<if_matched_sid>` com SIDs separados por vírgula não funcionou de forma confiável em regras de correlação. A 100304 usa `<if_matched_group>syscheck_file</if_matched_group>` para cobrir 550, 553 e 554 em uma única correlação.
 
 > **Aviso de calibração:** `frequency="3"`, `timeframe="600"` e `ignore="30"` foram calibrados para laboratório. Em produção, ajuste contra um baseline de atividade normal por grupo de agentes.
 
@@ -181,7 +181,7 @@ Na regra 100301 em Windows, o `same_field` sobre campos `syscheck` não foi conf
 
 ## Achados Técnicos
 
-Quinze achados validados e uma hipótese refutada, todos com evidência de laboratório. O detalhamento (comportamento, impacto, mitigação) está no capítulo 10 do Handbook.
+Quinze achados validados e uma hipótese refutada, todos com evidência de laboratório. O detalhamento dos 15 achados (comportamento, impacto, mitigação) está no capítulo 10 do Handbook. A hipótese refutada (AP-1) está documentada em [Uma hipótese refutada, documentada de propósito](#uma-hipótese-refutada-documentada-de-propósito). Os achados são observações de laboratório no Wazuh 4.14.x e não comportamentos declarados na documentação oficial.
 
 | ID | Achado | Tipo | Status |
 |---|---|---|---|
@@ -198,13 +198,13 @@ Quinze achados validados e uma hipótese refutada, todos com evidência de labor
 | AO-4 | `client_max_body_size` do nginx para payloads de análise | Integração | RESOLVIDO |
 | AO-5 | AbuseIPDB só é consultado via `connect` do auditd | Integração | RESOLVIDO |
 | AO-6 | VirusTotal não detecta payloads customizados | Integração | ESPERADO |
-| AO-7 | `windows_audit_interval` não recupera a SACL após restart do manager | Windows | MITIGADO |
+| AO-7 | SACL não restaurada após restart do manager | Windows | MITIGADO |
 | AO-8 | Caminho com `/*` expande o glob em arquivos individuais | Endpoint | RESOLVIDO |
 | AP-1 | Hipótese de stall do leitor inotify (refutada) | Daemon Linux | NÃO PROCEDE |
 
 Dois achados merecem atenção imediata em qualquer implantação, porque degradam a cobertura sem registrar erro:
 
-- **AO-7 (Windows):** após reiniciar o manager, a SACL do whodata não é reaplicada pelo `windows_audit_interval`. No LABDESK o gap foi de cerca de 25 minutos sem cobertura whodata, até um `Restart-Service WazuhSvc` manual. Mitigação: reiniciar o agente após o restart do manager.
+- **AO-7 (Windows):** após reiniciar o manager, o whodata no LABDESK ficou cerca de 25 minutos sem gerar eventos syscheck, até um `Restart-Service WazuhSvc` manual reaplicar a SACL. O `windows_audit_interval` apenas verifica a política e as SACLs e, em caso de divergência, move os diretórios para realtime; não reaplica a SACL. Mitigação: reiniciar o agente após o restart do manager.
 - **AO-8 (Linux):** `<directories>` com `/*` registra watches em arquivos individuais e deixa os arquivos novos sem cobertura realtime. Use o diretório sem o curinga. Segundo a [documentação oficial](https://documentation.wazuh.com/current/user-manual/reference/ossec-conf/syscheck.html), o realtime funciona com diretórios, não com arquivos individuais.
 
 ---
@@ -243,7 +243,8 @@ wazuh-fim-adh/
 │           └── wptv.plugin.js.gz
 │
 ├── docs/
-│   └── wazuh-fim-advanced-defenders-handbook-pt-br.docx   # Handbook completo
+│   ├── wazuh-fim-advanced-defenders-handbook-en-us.docx   # Handbook completo (EN-US)
+│   └── wazuh-fim-advanced-defenders-handbook-pt-br.docx   # Handbook completo (PT-BR, referência)
 │
 ├── README.md                         # English
 ├── README.pt-BR.md                   # Português (BR)
@@ -701,19 +702,21 @@ O capítulo 9 do Handbook cobre também o mapeamento de compliance (PCI DSS 4.0,
 
 ## Conteúdo do Handbook
 
+O Handbook é escrito em EN-US. Uma versão PT-BR fica em `docs/` como referência. Capítulos:
+
 | Capítulo | Conteúdo |
 |---|---|
-| 1. Sumário Executivo | Resultados, estrutura e ambiente de referência |
-| 2. Fundamentos do FIM | Arquitetura, os três modos, parâmetros, caminhos de rede e sincronização delta |
-| 3. FIM em Windows | SACL, `auditpol`, GPO, `windows_audit_interval`, rename e Registro |
-| 4. FIM em Linux | auditd, regras persistentes, CDB de audit-keys, provider eBPF, inotify e troubleshooting |
-| 5. Regras de Detecção de Anomalia | Seis regras, o padrão proxy da 100310 e evidências por plataforma |
+| 1. Executive Summary | Resultados, estrutura e ambiente de referência |
+| 2. Wazuh FIM Fundamentals | Arquitetura, os três modos, parâmetros, caminhos de rede e sincronização delta |
+| 3. FIM on Windows | SACL, `auditpol`, GPO, `windows_audit_interval`, rename e Registro |
+| 4. FIM on Linux | auditd, regras persistentes, CDB de audit-keys, provider eBPF, inotify e troubleshooting |
+| 5. Anomaly Detection Rules | Seis regras, o padrão proxy da 100310 e evidências por plataforma |
 | 6. FIM Alert Investigation | Arquitetura, threat intelligence, veredito do LLM e validações |
-| 7. Regras Complementares | Ciclo de vida do agente (504, 505, 506), overflow inotify (560) e Registro |
-| 8. Perspectiva do Adversário | Evasão, timestomping, padrão de ransomware e Sysmon como camada complementar (8.5) |
-| 9. Compliance e MITRE ATT&CK | PCI DSS, NIST, HIPAA, GDPR, TSC e técnicas |
-| 10. Achados Técnicos | 15 achados validados e 1 hipótese refutada |
-| 11. Configurações de Referência | Novidades da 4.14.8, `ossec.conf` endurecido, estado do servidor |
+| 7. Complementary Rules from the Default Ruleset | Ciclo de vida do agente (504, 505, 506), overflow inotify (560) e Registro |
+| 8. FIM from the Adversary's Perspective | Evasão, timestomping, padrão de ransomware e Sysmon como camada complementar (8.5) |
+| 9. Compliance and MITRE ATT&CK | PCI DSS, NIST, HIPAA, GDPR, TSC e técnicas |
+| 10. Validated Technical Findings | 15 achados validados (AC-1 a AC-7, AO-1 a AO-8) |
+| 11. Reference Configurations | Novidades da 4.14.8, `ossec.conf` endurecido, estado do servidor |
 
 ---
 
@@ -806,6 +809,17 @@ Wazuh Ambassador | Detection Engineering | Blue Team
 | Pares validados | Criação, sobrescrita via `cmd`, exclusão, drop de executável, timestomping e limpeza, cada um com o alerta FIM e o alerta Sysmon no mesmo caminho. |
 | Casos somente FIM documentados | Sobrescrita com `Set-Content`, append e rename não geraram evento Sysmon: o FIM é a única fonte nesses casos. |
 | Handbook revisado | 60 páginas, com a nova seção 8.5 "Sysmon como Camada Complementar ao FIM". |
+
+---
+
+## Atualização 2026-10-14
+
+| Mudança | Detalhe |
+|---|---|
+| Handbook em EN-US | O Handbook passa a ser entregue em EN-US, com a versão PT-BR mantida em `docs/` para referência. |
+| Revisão contra a documentação oficial | Afirmações conferidas com a documentação Wazuh 4.14 e o ruleset 4.14.8. Alinhados à documentação: o `windows_audit_interval` move o whodata para realtime em caso de divergência e não reaplica a SACL (seção 3.5, achado AO-7); a persistência por chave Run gera a regra 752 (valor adicionado); as regras nativas etiquetam o PCI DSS como `11.5`; a restrição de caminhos UNC passa a citar as notas de versão 4.13.0 (#30060). |
+| Observações de laboratório identificadas | Os achados AC-1 a AC-7 e AO-1 a AO-8 estão marcados como observações de laboratório na 4.14.x, não como comportamentos declarados na documentação oficial. |
+| Componente comunitário | O FIM Alert Investigation é declarado como componente comunitário, fora da plataforma Wazuh e sem suporte da Wazuh. |
 
 ---
 
