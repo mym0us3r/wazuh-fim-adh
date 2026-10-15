@@ -627,55 +627,55 @@ agent.name: "LABDESK" and (syscheck.path: *fim_sysmon_lab* or data.win.eventdata
 
 Evidências (capturas reais do Wazuh Discover):
 
-A numeração das figuras segue o Handbook (seção 8.5). A Figura 56 é uma captura do terminal; as Figuras 57 a 67 são consultas do Wazuh Discover, e cada legenda lista o `rule.id` dos alertas exibidos.
+A numeração das figuras segue o Handbook (seção 8.5). A Figura 57 é uma captura do terminal; as Figuras 58 a 68 são consultas do Wazuh Discover, e cada legenda lista o `rule.id` dos alertas exibidos.
 
-![Figura 56](docs/ev_sysmon_config_aplicada.png)
+![Figura 57](docs/ev_sysmon_config_aplicada.png)
 
-*Figura 56 - Validação do XML e aplicação da configuração do Sysmon nativo com sysmon -c no LABDESK (schema 4.91)*
+*Figura 57 - Validação do XML e aplicação da configuração do Sysmon nativo com sysmon -c no LABDESK (schema 4.91)*
 
-![Figura 57](docs/ev_sysmon_criacao_100541_fim_100300.png)
+![Figura 58](docs/ev_sysmon_criacao_100541_fim_100300.png)
 
-*Figura 57 - Criação do a.txt no LABDESK: regra 100541 (Sysmon, EID 11, 13:44:42.241 e 13:44:42.271) seguida da 100300 (FIM, 13:44:42.298)*
+*Figura 58 - Criação do a.txt no LABDESK: regra 100541 (Sysmon, EID 11, 13:44:42.241 e 13:44:42.271) seguida da 100300 (FIM, 13:44:42.298)*
 
-![Figura 58](docs/ev_sysmon_setcontent_fim_550.png)
+![Figura 59](docs/ev_sysmon_setcontent_fim_550.png)
 
-*Figura 58 - Sobrescrita com Set-Content: alerta 550 (FIM) às 14:14:09.810, sem alerta Sysmon associado (intervalo de 14:13 a 14:21)*
+*Figura 59 - Sobrescrita com Set-Content: alerta 550 (FIM) às 14:14:09.810, sem alerta Sysmon associado (intervalo de 14:13 a 14:21)*
 
-![Figura 59](docs/ev_sysmon_overwritecmd_100555_100541.png)
+![Figura 60](docs/ev_sysmon_overwritecmd_100555_100541.png)
 
-*Figura 59 - Sobrescrita com redirecionamento do cmd.exe: regras 100555 (Sysmon, EID 26, 14:18:57.882) e 100541 (Sysmon, EID 11, 14:18:57.966) com a imagem cmd.exe*
+*Figura 60 - Sobrescrita com redirecionamento do cmd.exe: regras 100555 (Sysmon, EID 26, 14:18:57.882) e 100541 (Sysmon, EID 11, 14:18:57.966) com a imagem cmd.exe*
 
-![Figura 60](docs/ev_sysmon_append_fim_550.png)
+![Figura 61](docs/ev_sysmon_append_fim_550.png)
 
-*Figura 60 - Anexar linha ao a.txt: consulta combinada por caminho (FIM ou Sysmon) retorna somente o alerta 550 (FIM) de 14:38:54.918*
+*Figura 61 - Anexar linha ao a.txt: consulta combinada por caminho (FIM ou Sysmon) retorna somente o alerta 550 (FIM) de 14:38:54.918*
 
-![Figura 61](docs/ev_sysmon_rename_fim_553_100310.png)
+![Figura 62](docs/ev_sysmon_rename_fim_553_100310.png)
 
-*Figura 61 - Renomear arquivos: alertas 553 (a.txt) e 100310 (b.txt) do FIM às 14:51:45.810, sem alerta Sysmon associado*
+*Figura 62 - Renomear arquivos: alertas 553 (a.txt) e 100310 (b.txt) do FIM às 14:51:45.810, sem alerta Sysmon associado*
 
-![Figura 62](docs/ev_sysmon_exclusao_fim_553_100555.png)
+![Figura 63](docs/ev_sysmon_exclusao_fim_553_100555.png)
 
-*Figura 62 - Exclusão do b.txt: alerta 553 (FIM) e alerta 100555 (Sysmon, EID 26) no mesmo caminho*
+*Figura 63 - Exclusão do b.txt: alerta 553 (FIM) e alerta 100555 (Sysmon, EID 26) no mesmo caminho*
 
-![Figura 63](docs/ev_sysmon_executavel_100540.png)
+![Figura 64](docs/ev_sysmon_executavel_100540.png)
 
-*Figura 63 - Cópia do executável tool_ps.exe pelo PowerShell: alerta 100540 (Sysmon, EID 11)*
+*Figura 64 - Cópia do executável tool_ps.exe pelo PowerShell: alerta 100540 (Sysmon, EID 11)*
 
-![Figura 64](docs/ev_sysmon_executavel_fim_100310.png)
+![Figura 65](docs/ev_sysmon_executavel_fim_100310.png)
 
-*Figura 64 - Mesmo executável no FIM: alerta 100310 (proxy da 554, modo scheduled) com os hashes MD5 e SHA-256 do arquivo*
+*Figura 65 - Mesmo executável no FIM: alerta 100310 (proxy da 554, modo scheduled) com os hashes MD5 e SHA-256 do arquivo*
 
-![Figura 65](docs/ev_sysmon_timestomp_100521.png)
+![Figura 66](docs/ev_sysmon_timestomp_100521.png)
 
-*Figura 65 - Alteração das datas do a.txt (timestomp): alerta 100521 (Sysmon, EID 2)*
+*Figura 66 - Alteração das datas do a.txt (timestomp): alerta 100521 (Sysmon, EID 2)*
 
-![Figura 66](docs/ev_sysmon_timestomp_fim_550.png)
+![Figura 67](docs/ev_sysmon_timestomp_fim_550.png)
 
-*Figura 66 - Mesma operação no FIM: alerta 550 (modo whodata) com o atributo mtime alterado*
+*Figura 67 - Mesma operação no FIM: alerta 550 (modo whodata) com o atributo mtime alterado*
 
-![Figura 67](docs/ev_sysmon_limpeza_100554_100303.png)
+![Figura 68](docs/ev_sysmon_limpeza_100554_100303.png)
 
-*Figura 67 - Limpeza dos arquivos de teste: 553 e 100555 (a.txt), 100554 (Sysmon, EID 26) e 100303 (FIM) para o tool_ps.exe*
+*Figura 68 - Limpeza dos arquivos de teste: 553 e 100555 (a.txt), 100554 (Sysmon, EID 26) e 100303 (FIM) para o tool_ps.exe*
 
 ---
 
