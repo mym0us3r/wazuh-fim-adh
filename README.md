@@ -740,7 +740,8 @@ The Handbook is written in EN-US. A PT-BR version is kept in `docs/` for referen
 | 8. FIM from the Adversary's Perspective | Evasion, timestomping, ransomware event pattern and Sysmon as a complementary layer (8.5) |
 | 9. Compliance and MITRE ATT&CK | PCI DSS, NIST, HIPAA, GDPR, TSC and techniques |
 | 10. Validated Technical Findings | 15 validated findings (AC-1 to AC-7, AO-1 to AO-8) |
-| 11. Reference Configurations | What is new in 4.14.8, hardened `ossec.conf`, server state |
+| 11. Reference Configurations | What is new in 4.14.8, hardened `ossec.conf`, server state and conclusion |
+| 12. Official References | Verified Wazuh documentation and project references |
 
 ---
 
@@ -845,6 +846,17 @@ Wazuh Ambassador | Detection Engineering | Blue Team
 | Lab observations labeled | Findings AC-1 to AC-7 and AO-1 to AO-8 are marked as lab observations on 4.14.x, not as behaviors stated in the official documentation. |
 | Community component | FIM Alert Investigation is declared as a community component, not part of the Wazuh platform and not supported by Wazuh. |
 | Rule inventory | New section with the rule count per file (11 Wazuh rules) and the Linux Audit rules on labnix, with what each group does. |
+
+---
+
+## Update 2026-10-15
+
+| Change | Detail |
+|---|---|
+| Handbook finalized | Final EN-US and PT-BR editions (63 and 64 pages, as in the final PDFs). |
+| New section 11.5 | Conclusion on FIM in the Wazuh ecosystem and on how to apply it in small, medium and large organizations. The official references moved to chapter 12. |
+| Figure 55 | The Active Response workflow figure (section 7.4) now has a caption with its source in the Wazuh documentation. The Handbook has 68 figures, numbered 1 to 68. |
+| Server state | Table 26 now lists `fim_sysmon_rules.xml` (5 rules) next to `fim_anomaly_rules.xml` (6 rules). The cover states 11 custom rules. |
 
 ---
 
