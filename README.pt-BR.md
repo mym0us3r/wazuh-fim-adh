@@ -2,7 +2,7 @@
 
 [English](README.md) | **Português (BR)**
 
-> **Detection engineering sobre o File Integrity Monitoring do Wazuh 4.14.8 (4.14.x series) · Windows e Linux · correlação de anomalia + investigação assistida por IA**
+> **Detection engineering sobre o File Integrity Monitoring do Wazuh 4.14.8 (série 4.14.x) · Windows e Linux · correlação de anomalia + investigação assistida por IA**
 
 ![custom_rules](https://img.shields.io/badge/regras_customizadas-6-brightgreen)
 ![findings](https://img.shields.io/badge/achados_validados-15-blue)
@@ -740,7 +740,8 @@ O Handbook é escrito em EN-US. Uma versão PT-BR fica em `docs/` como referênc
 | 8. FIM from the Adversary's Perspective | Evasão, timestomping, padrão de ransomware e Sysmon como camada complementar (8.5) |
 | 9. Compliance and MITRE ATT&CK | PCI DSS, NIST, HIPAA, GDPR, TSC e técnicas |
 | 10. Validated Technical Findings | 15 achados validados (AC-1 a AC-7, AO-1 a AO-8) |
-| 11. Reference Configurations | Novidades da 4.14.8, `ossec.conf` endurecido, estado do servidor |
+| 11. Reference Configurations | Novidades da 4.14.8, `ossec.conf` endurecido, estado do servidor e conclusão |
+| 12. Official References | Referências verificadas da documentação Wazuh e do projeto |
 
 ---
 
@@ -845,6 +846,17 @@ Wazuh Ambassador | Detection Engineering | Blue Team
 | Observações de laboratório identificadas | Os achados AC-1 a AC-7 e AO-1 a AO-8 estão marcados como observações de laboratório na 4.14.x, não como comportamentos declarados na documentação oficial. |
 | Componente comunitário | O FIM Alert Investigation é declarado como componente comunitário, fora da plataforma Wazuh e sem suporte da Wazuh. |
 | Inventário de regras | Nova seção com a contagem de regras por arquivo (11 regras Wazuh) e as regras do Linux Audit no labnix, com o que cada grupo faz. |
+
+---
+
+## Atualização 2026-10-15
+
+| Mudança | Detalhe |
+|---|---|
+| Handbook finalizado | Edições finais em EN-US e PT-BR (63 e 64 páginas, conforme os PDFs finais). |
+| Nova seção 11.5 | Conclusão sobre o FIM no ecossistema Wazuh e sobre como aplicá-lo em organizações pequenas, médias e grandes. As referências oficiais passaram para o capítulo 12. |
+| Figura 55 | A figura do fluxo do Active Response (seção 7.4) agora tem legenda com a fonte na documentação do Wazuh. O Handbook tem 68 figuras, numeradas de 1 a 68. |
+| Estado do servidor | A Tabela 26 agora lista o `fim_sysmon_rules.xml` (5 regras) ao lado do `fim_anomaly_rules.xml` (6 regras). A capa informa 11 regras customizadas. |
 
 ---
 
