@@ -2,7 +2,7 @@
 
 [English](README.md) | **Português (BR)**
 
-> **Detection engineering sobre o File Integrity Monitoring do Wazuh 4.14.8 · Windows e Linux · correlação de anomalia + investigação assistida por IA**
+> **Detection engineering sobre o File Integrity Monitoring do Wazuh 4.14.8 (4.14.x series) · Windows e Linux · correlação de anomalia + investigação assistida por IA**
 
 ![custom_rules](https://img.shields.io/badge/regras_customizadas-6-brightgreen)
 ![findings](https://img.shields.io/badge/achados_validados-15-blue)
