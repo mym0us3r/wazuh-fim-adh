@@ -215,7 +215,7 @@ Dois achados merecem atenção imediata em qualquer implantação, porque degrad
 wazuh-fim-adh/
 │
 ├── rules/
-│   └── fim_anomaly_rules.xml         # Regras 100310 + 100300-100304
+│   └── fim_anomaly_rules.xml         # 6 Rules 100300, 100301, 100302, 100303, 100304, 100310
 │
 ├── config/
 │   ├── ossec_MANAGER.conf            # ossec.conf do manager
@@ -223,7 +223,7 @@ wazuh-fim-adh/
 │   └── ossec_Endpoint_LABNIX.conf    # Agente Linux (LABNIX): whodata + realtime
 │
 ├── sysmon/                           # Conjunto de pesquisa: Sysmon como camada sobre o FIM
-│   └── fim_sysmon_rules.xml          # Regras 100521, 100540, 100541, 100554, 100555
+│   └── fim_sysmon_rules.xml          # 5 Rules 100521, 100540, 100541, 100554, 100555
 │
 ├── wptv-fim/                         # WAZUH-Process-Tree-Viewer + FIM Alert Investigation
 │   ├── server.py                     # Rotas Flask (/wptv/, /fim/, /api/fim/*)
