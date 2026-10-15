@@ -627,55 +627,55 @@ agent.name: "LABDESK" and (syscheck.path: *fim_sysmon_lab* or data.win.eventdata
 
 Evidence (real captures from Wazuh Discover):
 
-The figure numbers follow the Handbook (section 8.5). Figure 56 is a terminal capture; Figures 57 to 67 are Wazuh Discover queries, and each caption lists the `rule.id` of the alerts shown.
+The figure numbers follow the Handbook (section 8.5). Figure 57 is a terminal capture; Figures 58 to 68 are Wazuh Discover queries, and each caption lists the `rule.id` of the alerts shown.
 
-![Figure 56](docs/ev_sysmon_config_aplicada.png)
+![Figure 57](docs/ev_sysmon_config_aplicada.png)
 
-*Figure 56 - Sysmon XML validation and application of the native Sysmon configuration with sysmon -c on LABDESK (schema 4.91)*
+*Figure 57 - Sysmon XML validation and application of the native Sysmon configuration with sysmon -c on LABDESK (schema 4.91)*
 
-![Figure 57](docs/ev_sysmon_criacao_100541_fim_100300.png)
+![Figure 58](docs/ev_sysmon_criacao_100541_fim_100300.png)
 
-*Figure 57 - Creation of a.txt on LABDESK: rule 100541 (Sysmon, EID 11, 13:44:42.241 and 13:44:42.271) followed by 100300 (FIM, 13:44:42.298)*
+*Figure 58 - Creation of a.txt on LABDESK: rule 100541 (Sysmon, EID 11, 13:44:42.241 and 13:44:42.271) followed by 100300 (FIM, 13:44:42.298)*
 
-![Figure 58](docs/ev_sysmon_setcontent_fim_550.png)
+![Figure 59](docs/ev_sysmon_setcontent_fim_550.png)
 
-*Figure 58 - Overwrite with Set-Content: alert 550 (FIM) at 14:14:09.810, with no associated Sysmon alert (range 14:13 to 14:21)*
+*Figure 59 - Overwrite with Set-Content: alert 550 (FIM) at 14:14:09.810, with no associated Sysmon alert (range 14:13 to 14:21)*
 
-![Figure 59](docs/ev_sysmon_overwritecmd_100555_100541.png)
+![Figure 60](docs/ev_sysmon_overwritecmd_100555_100541.png)
 
-*Figure 59 - Overwrite with cmd.exe redirection: rules 100555 (Sysmon, EID 26, 14:18:57.882) and 100541 (Sysmon, EID 11, 14:18:57.966) with image cmd.exe*
+*Figure 60 - Overwrite with cmd.exe redirection: rules 100555 (Sysmon, EID 26, 14:18:57.882) and 100541 (Sysmon, EID 11, 14:18:57.966) with image cmd.exe*
 
-![Figure 60](docs/ev_sysmon_append_fim_550.png)
+![Figure 61](docs/ev_sysmon_append_fim_550.png)
 
-*Figure 60 - Append a line to a.txt: combined query by path (FIM or Sysmon) returns only alert 550 (FIM) at 14:38:54.918*
+*Figure 61 - Append a line to a.txt: combined query by path (FIM or Sysmon) returns only alert 550 (FIM) at 14:38:54.918*
 
-![Figure 61](docs/ev_sysmon_rename_fim_553_100310.png)
+![Figure 62](docs/ev_sysmon_rename_fim_553_100310.png)
 
-*Figure 61 - Rename files: FIM alerts 553 (a.txt) and 100310 (b.txt) at 14:51:45.810, with no associated Sysmon alert*
+*Figure 62 - Rename files: FIM alerts 553 (a.txt) and 100310 (b.txt) at 14:51:45.810, with no associated Sysmon alert*
 
-![Figure 62](docs/ev_sysmon_exclusao_fim_553_100555.png)
+![Figure 63](docs/ev_sysmon_exclusao_fim_553_100555.png)
 
-*Figure 62 - Deletion of b.txt: alert 553 (FIM) and alert 100555 (Sysmon, EID 26) on the same path*
+*Figure 63 - Deletion of b.txt: alert 553 (FIM) and alert 100555 (Sysmon, EID 26) on the same path*
 
-![Figure 63](docs/ev_sysmon_executavel_100540.png)
+![Figure 64](docs/ev_sysmon_executavel_100540.png)
 
-*Figure 63 - Copy of the executable tool_ps.exe by PowerShell: alert 100540 (Sysmon, EID 11)*
+*Figure 64 - Copy of the executable tool_ps.exe by PowerShell: alert 100540 (Sysmon, EID 11)*
 
-![Figure 64](docs/ev_sysmon_executavel_fim_100310.png)
+![Figure 65](docs/ev_sysmon_executavel_fim_100310.png)
 
-*Figure 64 - Same executable in FIM: alert 100310 (proxy for 554, scheduled mode) with the file's MD5 and SHA-256 hashes*
+*Figure 65 - Same executable in FIM: alert 100310 (proxy for 554, scheduled mode) with the file's MD5 and SHA-256 hashes*
 
-![Figure 65](docs/ev_sysmon_timestomp_100521.png)
+![Figure 66](docs/ev_sysmon_timestomp_100521.png)
 
-*Figure 65 - Change of a.txt dates (timestomp): alert 100521 (Sysmon, EID 2)*
+*Figure 66 - Change of a.txt dates (timestomp): alert 100521 (Sysmon, EID 2)*
 
-![Figure 66](docs/ev_sysmon_timestomp_fim_550.png)
+![Figure 67](docs/ev_sysmon_timestomp_fim_550.png)
 
-*Figure 66 - Same operation in FIM: alert 550 (whodata mode) with the mtime attribute changed*
+*Figure 67 - Same operation in FIM: alert 550 (whodata mode) with the mtime attribute changed*
 
-![Figure 67](docs/ev_sysmon_limpeza_100554_100303.png)
+![Figure 68](docs/ev_sysmon_limpeza_100554_100303.png)
 
-*Figure 67 - Cleanup of the test files: 553 and 100555 (a.txt), 100554 (Sysmon, EID 26) and 100303 (FIM) for tool_ps.exe*
+*Figure 68 - Cleanup of the test files: 553 and 100555 (a.txt), 100554 (Sysmon, EID 26) and 100303 (FIM) for tool_ps.exe*
 
 ---
 
