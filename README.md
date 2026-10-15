@@ -2,7 +2,7 @@
 
 **English** | [Português (BR)](README.pt-BR.md)
 
-> **Detection engineering on top of Wazuh 4.14.8 File Integrity Monitoring · Windows and Linux · anomaly correlation + AI-assisted investigation**
+> **Detection engineering on top of Wazuh 4.14.8 (4.14.x series) File Integrity Monitoring · Windows and Linux · anomaly correlation + AI-assisted investigation**
 
 ![custom_rules](https://img.shields.io/badge/custom_rules-6-brightgreen)
 ![findings](https://img.shields.io/badge/validated_findings-15-blue)
